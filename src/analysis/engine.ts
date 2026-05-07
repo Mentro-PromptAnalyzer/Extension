@@ -7,7 +7,7 @@ export interface LiveScore {
   // The four dimensions shown in the UI
   ownership: number;      // autonomy
   depth: number;          // curiosity
-  rigor: number;          // criticalThinking
+  critical: number;       // criticalThinking
   clarity: number;        // specificity + context averaged
   intent: PromptIntent | 'unknown';
   flags: string[];
@@ -25,7 +25,7 @@ export function analyzePrompt(text: string): LiveScore {
       overall: 0,
       ownership: 0,
       depth: 0,
-      rigor: 0,
+      critical: 0,
       clarity: 0,
       intent: 'unknown',
       flags: [],
@@ -42,7 +42,7 @@ export function analyzePrompt(text: string): LiveScore {
   // Map to UI dimensions
   const ownership = quality.autonomy;
   const depth     = quality.curiosity;
-  const rigor     = quality.criticalThinking;
+  const critical  = quality.criticalThinking;
   const clarity   = Math.round((quality.specificity + quality.context) / 2);
 
   // Build actionable suggestions based on what's low
@@ -54,7 +54,7 @@ export function analyzePrompt(text: string): LiveScore {
   if (depth < 40) {
     suggestions.push("Ask 'why' or 'how' to go deeper than a surface answer.");
   }
-  if (rigor < 40) {
+  if (critical < 40) {
     suggestions.push("Push back — ask about edge cases, risks, or alternatives.");
   }
   if (clarity < 40) {
@@ -65,7 +65,7 @@ export function analyzePrompt(text: string): LiveScore {
     overall,
     ownership,
     depth,
-    rigor,
+    critical,
     clarity,
     intent,
     flags,

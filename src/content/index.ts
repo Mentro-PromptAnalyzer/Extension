@@ -5,10 +5,15 @@
 
 import { detectPlatform, findInputElement, getInputText } from './selectors';
 import { analyzePrompt } from '../analysis/engine';
-import { renderOverlay, hideOverlay } from './overlay';
+import { renderOverlay, hideOverlay, setBadgeLoading } from './overlay';
+import { scoreWithOllama } from '../analysis/ollama';
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let ollamaTimer: ReturnType<typeof setTimeout> | null = null;
+let pulseTimer: ReturnType<typeof setTimeout> | null = null;
 const DEBOUNCE_MS = 300;
+const PULSE_DELAY_MS = 600;  // delay after heuristic before pulse starts
+const OLLAMA_EXTRA_MS = 1200; // additional wait after heuristic fires before hitting Ollama (total = 1500ms from last keystroke)
 
 function safeSendMessage(message: object): void {
   try {
@@ -19,8 +24,17 @@ function safeSendMessage(message: object): void {
   }
 }
 
+// Generation counter — incremented once per input change so stale Ollama
+// responses don't overwrite a newer score.
+let currentOllamaGen = 0;
+
 function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatform>): void {
   if (debounceTimer) clearTimeout(debounceTimer);
+  if (ollamaTimer) clearTimeout(ollamaTimer);
+
+  // Cancel pulse immediately if the user resumes typing
+  if (pulseTimer) { clearTimeout(pulseTimer); pulseTimer = null; }
+  setBadgeLoading(false);
 
   debounceTimer = setTimeout(() => {
     const text = getInputText(el);
@@ -31,10 +45,56 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
       return;
     }
 
-    const score = analyzePrompt(text);
-    renderOverlay(score, el, platform ?? undefined);
-    safeSendMessage({ type: 'SCORE_UPDATE', score });
+    // Layer 1: instant heuristic score
+    const heuristicScore = analyzePrompt(text);
+    renderOverlay(heuristicScore, el, platform ?? undefined);
+    safeSendMessage({ type: 'SCORE_UPDATE', score: heuristicScore });
+
+    // Bump gen once, here, after the heuristic fires
+    const gen = ++currentOllamaGen;
+
+    // Start pulse after a short delay — feels natural, not jarring
+    pulseTimer = setTimeout(() => {
+      pulseTimer = null;
+      setBadgeLoading(true);
+    }, PULSE_DELAY_MS);
+
+    // Layer 2: async Ollama re-score after typing fully settles
+    ollamaTimer = setTimeout(() => {
+      scheduleOllamaScore(text, heuristicScore, el, platform, gen);
+    }, OLLAMA_EXTRA_MS);
   }, DEBOUNCE_MS);
+}
+
+async function scheduleOllamaScore(
+  text: string,
+  heuristicScore: ReturnType<typeof analyzePrompt>,
+  el: HTMLElement,
+  platform: ReturnType<typeof detectPlatform>,
+  gen: number,
+): Promise<void> {
+  console.log('[AskBetter] Ollama scoring started');
+
+  const aiScore = await scoreWithOllama(text);
+
+  // If the user kept typing, a newer generation is running — discard this result
+  if (gen !== currentOllamaGen) return;
+
+  // Stop pulsing regardless of whether Ollama succeeded
+  setBadgeLoading(false);
+
+  if (!aiScore) {
+    console.log('[AskBetter] Ollama unavailable or returned invalid response');
+    return;
+  }
+
+  // Merge AI scores over the heuristic base — flags come from heuristic,
+  // everything else (scores, intent, suggestions) comes from Ollama.
+  const merged = { ...heuristicScore, ...aiScore };
+
+  console.log('[AskBetter] Ollama score received:', merged.overall);
+  renderOverlay(merged, el, platform ?? undefined);
+  safeSendMessage({ type: 'SCORE_UPDATE', score: merged });
 }
 
 let activeInput: HTMLElement | null = null;
@@ -55,7 +115,6 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
 
   // MutationObserver for contenteditable changes
   const observer = new MutationObserver(() => {
-    console.log('[AskBetter] mutation fired');
     onInputChange(input, platform);
   });
   observer.observe(input, { childList: true, subtree: true, characterData: true });
@@ -63,12 +122,10 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
 
   // 'input' event covers direct keyboard input
   input.addEventListener('input', () => {
-    console.log('[AskBetter] input event fired');
     onInputChange(input, platform);
   });
   // 'keyup' catches deletions in contenteditable that may not fire 'input'
   input.addEventListener('keyup', () => {
-    console.log('[AskBetter] keyup event fired');
     onInputChange(input, platform);
   });
 

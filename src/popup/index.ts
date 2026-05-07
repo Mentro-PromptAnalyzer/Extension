@@ -28,8 +28,8 @@ function renderScore(score: any): void {
       <span class="score-value">${score.depth}</span>
     </div>
     <div class="score-row">
-      <span class="score-label">Rigor</span>
-      <span class="score-value">${score.rigor}</span>
+      <span class="score-label">Critical</span>
+      <span class="score-value">${score.critical}</span>
     </div>
     <div class="score-row">
       <span class="score-label">Clarity</span>

@@ -22,21 +22,22 @@ src/                 # All source TypeScript
 | `types.ts` | Shared types: `PromptIntent`, `IntentScores`, `QualityScores` |
 | `classifier.ts` | Signal-based intent scoring (`scoreIntents`, `primaryIntentFrom`) |
 | `rubric.ts` | Flag detection and quality scoring (`detectFlags`, `scorePromptQuality`, `computeQualityScore`) |
-| `engine.ts` | Public API — `analyzePrompt(text): LiveScore` — composes classifier + rubric into UI-ready scores |
+| `engine.ts` | Public API — `analyzePrompt(text): LiveScore` — composes classifier + rubric into UI-ready scores. `LiveScore` dimensions: `ownership`, `depth`, `critical`, `clarity` |
+| `ollama.ts` | Thin proxy — `scoreWithOllama(text)` sends an `OLLAMA_SCORE` message to the background worker and returns the result. Does not fetch directly (content scripts on https:// pages cannot make http:// requests — Chrome mixed-content block) |
 
 ### `src/content/` — Injected into AI platform pages
 
 | File | Responsibility |
 |---|---|
-| `index.ts` | Entry point — detects platform, polls for input element, attaches observers via `attachToInput()`, debounces analysis, sends messages to background. Tracks `activeInput`/`activeObserver` module-level refs; 1 s heartbeat re-attaches if SPA replaces the element; `visibilitychange` re-scores on tab focus |
+| `index.ts` | Entry point — detects platform, polls for input element, attaches observers via `attachToInput()`, debounces analysis, sends messages to background. Tracks `activeInput`/`activeObserver` module-level refs; 1 s heartbeat re-attaches if SPA replaces the element; `visibilitychange` re-scores on tab focus. Two-layer scoring: heuristic fires at 300 ms debounce, Ollama async re-score fires at 1500 ms debounce with spinner feedback |
 | `selectors.ts` | `PlatformConfig` type + per-platform DOM selectors for ChatGPT, Gemini, Perplexity |
-| `overlay.ts` | Floating badge + sub-bubble UI — all DOM creation is imperative vanilla JS, no framework |
+| `overlay.ts` | Floating badge + sub-bubble UI — all DOM creation is imperative vanilla JS, no framework. Exports `setBadgeLoading(bool)` which toggles a CSS pulsing border animation on the badge while Ollama scoring is pending |
 
 ### `src/background/` — Service worker
 
 | File | Responsibility |
 |---|---|
-| `index.ts` | Receives `SCORE_UPDATE` and `PROMPT_SUBMITTED` messages from content script; serves `GET_LATEST_SCORE` to popup |
+| `index.ts` | Receives `SCORE_UPDATE` and `PROMPT_SUBMITTED` messages from content script; serves `GET_LATEST_SCORE` to popup; proxies `OLLAMA_SCORE` requests to `http://localhost:11434` (background has no mixed-content restriction unlike content scripts) |
 
 ### `src/popup/` — Extension popup
 
@@ -48,8 +49,12 @@ src/                 # All source TypeScript
 
 - `src/analysis/` must stay DOM-free and platform-agnostic — it can be unit tested in isolation
 - `src/content/` is the only layer that touches the page DOM
-- Message passing between layers uses typed discriminated unions (`type: 'SCORE_UPDATE' | 'PROMPT_SUBMITTED' | 'GET_LATEST_SCORE'`)
+- Message passing between layers uses typed discriminated unions (`type: 'SCORE_UPDATE' | 'PROMPT_SUBMITTED' | 'GET_LATEST_SCORE' | 'OLLAMA_SCORE'`)
 - The overlay (`overlay.ts`) manages its own state (`currentScore`, `bubblesVisible`) as module-level variables — there is no external state store
 - Platform selectors live exclusively in `selectors.ts` — never hardcode selectors elsewhere
 - All scores are integers 0–100, clamped via `clamp()` in `rubric.ts`
 - The `LiveScore` interface (defined in `engine.ts`) is the single contract between analysis and UI layers
+- **Two-layer scoring**: heuristic (`engine.ts`) fires instantly at 300 ms debounce; Ollama (`ollama.ts`) fires async at 1500 ms debounce and merges over the heuristic result. Ollama failures are silent — heuristic score remains. Badge border pulses purple 600 ms after heuristic fires to signal AI scoring is pending; pulse cancels immediately if user resumes typing.
+- **Ollama fetch lives in the background worker** (`background/index.ts`), not in the content script. Content scripts on https:// pages cannot make http:// requests (Chrome mixed-content block). `ollama.ts` is a thin message-passing wrapper only.
+- **Ollama CORS config required**: Ollama rejects requests from `chrome-extension://` origins by default (403). Must set `OLLAMA_ORIGINS="chrome-extension://*"` before starting Ollama. Persistent setup: add `export OLLAMA_ORIGINS="chrome-extension://*"` to `~/.zshrc`, or run `launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"` once for the macOS app. Model: `llama3.2`, timeout: 30 s (first inference is slow — warm up with `ollama run llama3.2` before use).
+- **Ollama system prompt** uses anchored scale descriptions (0/40/70/100 examples per dimension) and a calibration example with expected scores to keep scoring consistent across model runs.

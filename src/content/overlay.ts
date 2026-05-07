@@ -8,6 +8,8 @@ import type { PlatformConfig } from './selectors';
 
 const BADGE_ID = 'askbetter-badge';
 const BUBBLE_CLASS = 'askbetter-bubble';
+const PULSE_STYLE_ID = 'askbetter-pulse-style';
+const PULSE_CLASS = 'askbetter-pulsing';
 const BASE_Z = 999998;
 const BADGE_Z = 999999;
 
@@ -25,8 +27,8 @@ const ARC = [
   { x:  72, y: -70 },
 ];
 
-const LABELS = ['Ownership', 'Depth', 'Rigor', 'Clarity'];
-const KEYS: (keyof LiveScore)[] = ['ownership', 'depth', 'rigor', 'clarity'];
+const LABELS = ['Ownership', 'Depth', 'Critical', 'Clarity'];
+const KEYS: (keyof LiveScore)[] = ['ownership', 'depth', 'critical', 'clarity'];
 
 let currentScore: LiveScore | null = null;
 let bubblesVisible = false;
@@ -318,6 +320,42 @@ function hideBubbles(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Pulsing border — shown while the Ollama AI score is pending
+// ---------------------------------------------------------------------------
+
+function injectPulseStyles(): void {
+  if (document.getElementById(PULSE_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = PULSE_STYLE_ID;
+  style.textContent = `
+    @keyframes askbetter-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.7), 0 2px 10px rgba(0,0,0,0.4); border-color: #a78bfa; }
+      50%  { box-shadow: 0 0 0 4px rgba(167, 139, 250, 0), 0 2px 10px rgba(0,0,0,0.4); border-color: #c4b5fd; }
+      100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0), 0 2px 10px rgba(0,0,0,0.4); border-color: #a78bfa; }
+    }
+    #${BADGE_ID}.${PULSE_CLASS} {
+      animation: askbetter-pulse 1.2s ease-in-out infinite;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+/**
+ * Toggle the pulsing border on the badge.
+ * Call with true when Ollama scoring starts, false when it resolves.
+ */
+export function setBadgeLoading(loading: boolean): void {
+  injectPulseStyles();
+  const badge = document.getElementById(BADGE_ID);
+  if (!badge) return;
+  if (loading) {
+    badge.classList.add(PULSE_CLASS);
+  } else {
+    badge.classList.remove(PULSE_CLASS);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -353,7 +391,7 @@ export function renderOverlay(score: LiveScore, inputEl: HTMLElement, platform?:
     badge.addEventListener('mouseenter', () => showBubbles(badge!));
     document.body.appendChild(badge);
 
-    // Fade in — start transparent, then transition to visible
+    // Fade in
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         badge!.style.opacity = '1';
