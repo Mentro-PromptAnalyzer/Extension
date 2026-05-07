@@ -1,28 +1,21 @@
-// ---------------------------------------------------------------------------
-// Lightweight analysis engine for the extension
-// This is a slimmed-down version of askbetter/src/analysis/ that runs
-// on a single prompt (not a full conversation) for real-time feedback.
-//
-// When you're ready to build this out, copy the core logic from:
-//   - askbetter/src/analysis/classifier.ts  (intent classification)
-//   - askbetter/src/analysis/rubric.ts      (quality scoring)
-//   - askbetter/src/analysis/types.ts       (shared types)
-// ---------------------------------------------------------------------------
+import { scoreIntents, primaryIntentFrom } from './classifier';
+import { detectFlags, scorePromptQuality, computeQualityScore } from './rubric';
+import type { PromptIntent } from './types';
 
 export interface LiveScore {
   overall: number;
-  autonomy: number;
-  curiosity: number;
-  criticalThinking: number;
-  specificity: number;
-  intent: 'delegation' | 'curiosity' | 'collaborative' | 'verification' | 'unknown';
+  // The four dimensions shown in the UI
+  ownership: number;      // autonomy
+  depth: number;          // curiosity
+  rigor: number;          // criticalThinking
+  clarity: number;        // specificity + context averaged
+  intent: PromptIntent | 'unknown';
   flags: string[];
   suggestions: string[];
 }
 
 /**
  * Analyze a single prompt in real-time as the user types.
- * Returns scores and suggestions for the current prompt text.
  */
 export function analyzePrompt(text: string): LiveScore {
   const trimmed = text.trim();
@@ -30,53 +23,51 @@ export function analyzePrompt(text: string): LiveScore {
   if (trimmed.length < 5) {
     return {
       overall: 0,
-      autonomy: 0,
-      curiosity: 0,
-      criticalThinking: 0,
-      specificity: 0,
+      ownership: 0,
+      depth: 0,
+      rigor: 0,
+      clarity: 0,
       intent: 'unknown',
       flags: [],
       suggestions: ['Start typing your prompt...'],
     };
   }
 
-  // TODO: Port scoring logic from askbetter/src/analysis/rubric.ts
-  // TODO: Port intent classification from askbetter/src/analysis/classifier.ts
-  // For now, return placeholder scores
+  const intentScores = scoreIntents(trimmed);
+  const intent = primaryIntentFrom(intentScores);
+  const flags = detectFlags(trimmed);
+  const quality = scorePromptQuality(trimmed, flags, intent);
+  const overall = computeQualityScore(quality);
 
-  const lower = trimmed.toLowerCase();
-  const wordCount = trimmed.split(/\s+/).length;
-  const hasQuestion = /\?/.test(trimmed);
-  const hasContext = wordCount > 20;
-  const hasWhy = /\b(why|how|what if|explain|reason)\b/i.test(lower);
-  const hasConstraints = /\b(but|however|constraint|limit|require|must|should)\b/i.test(lower);
+  // Map to UI dimensions
+  const ownership = quality.autonomy;
+  const depth     = quality.curiosity;
+  const rigor     = quality.criticalThinking;
+  const clarity   = Math.round((quality.specificity + quality.context) / 2);
 
-  const flags: string[] = [];
+  // Build actionable suggestions based on what's low
   const suggestions: string[] = [];
 
-  // Basic scoring heuristics (replace with full engine later)
-  let autonomy = 30;
-  let curiosity = 30;
-  let criticalThinking = 30;
-  let specificity = 30;
-
-  if (hasContext) { specificity += 25; autonomy += 15; }
-  if (hasQuestion) { curiosity += 20; }
-  if (hasWhy) { curiosity += 25; criticalThinking += 20; flags.push('asks_for_reasoning'); }
-  if (hasConstraints) { specificity += 20; flags.push('has_constraints'); }
-  if (wordCount < 10) { suggestions.push('Add more context — what have you tried? What constraints do you have?'); }
-  if (!hasQuestion) { suggestions.push('Try asking a question instead of just giving a command.'); }
-  if (!hasWhy) { suggestions.push('Ask "why" or "how" to deepen the conversation.'); }
-
-  const overall = Math.round((autonomy + curiosity + criticalThinking + specificity) / 4);
+  if (ownership < 40) {
+    suggestions.push("Show your thinking — what have you already tried or considered?");
+  }
+  if (depth < 40) {
+    suggestions.push("Ask 'why' or 'how' to go deeper than a surface answer.");
+  }
+  if (rigor < 40) {
+    suggestions.push("Push back — ask about edge cases, risks, or alternatives.");
+  }
+  if (clarity < 40) {
+    suggestions.push("Add context: who is this for, what constraints do you have?");
+  }
 
   return {
-    overall: Math.min(100, overall),
-    autonomy: Math.min(100, autonomy),
-    curiosity: Math.min(100, curiosity),
-    criticalThinking: Math.min(100, criticalThinking),
-    specificity: Math.min(100, specificity),
-    intent: hasWhy ? 'curiosity' : hasQuestion ? 'collaborative' : 'delegation',
+    overall,
+    ownership,
+    depth,
+    rigor,
+    clarity,
+    intent,
     flags,
     suggestions: suggestions.slice(0, 3),
   };

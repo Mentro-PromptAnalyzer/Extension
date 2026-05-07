@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Update Steering Docs",
+  "description": "After each agent session, reviews the three steering files and updates any that are out of sync with recent code changes",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the three steering files in .kiro/steering/ (product.md, tech.md, structure.md) against the current state of the codebase. Check if any new files, modules, dependencies, features, or architectural patterns were added or changed during this session. If anything is out of date or missing, update only the affected steering files. Keep entries concise — these docs are for LLM context, not human prose. If nothing changed, do nothing."
+  }
+}

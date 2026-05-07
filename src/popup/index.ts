@@ -20,20 +20,20 @@ function renderScore(score: any): void {
     </div>
 
     <div class="score-row">
-      <span class="score-label">Autonomy</span>
-      <span class="score-value">${score.autonomy}</span>
+      <span class="score-label">Ownership</span>
+      <span class="score-value">${score.ownership}</span>
     </div>
     <div class="score-row">
-      <span class="score-label">Curiosity</span>
-      <span class="score-value">${score.curiosity}</span>
+      <span class="score-label">Depth</span>
+      <span class="score-value">${score.depth}</span>
     </div>
     <div class="score-row">
-      <span class="score-label">Critical Thinking</span>
-      <span class="score-value">${score.criticalThinking}</span>
+      <span class="score-label">Rigor</span>
+      <span class="score-value">${score.rigor}</span>
     </div>
     <div class="score-row">
-      <span class="score-label">Specificity</span>
-      <span class="score-value">${score.specificity}</span>
+      <span class="score-label">Clarity</span>
+      <span class="score-value">${score.clarity}</span>
     </div>
 
     <div style="margin-top: 12px; padding: 8px; background: rgba(139, 92, 246, 0.08); border-radius: 8px;">

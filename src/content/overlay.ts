@@ -26,7 +26,7 @@ const ARC = [
 ];
 
 const LABELS = ['Ownership', 'Depth', 'Rigor', 'Clarity'];
-const KEYS: (keyof LiveScore)[] = ['autonomy', 'curiosity', 'criticalThinking', 'specificity'];
+const KEYS: (keyof LiveScore)[] = ['ownership', 'depth', 'rigor', 'clarity'];
 
 let currentScore: LiveScore | null = null;
 let bubblesVisible = false;
@@ -264,7 +264,20 @@ function stopMouseTracking(): void {
 }
 
 function showBubbles(badge: HTMLElement): void {
-  if (bubblesVisible || !currentScore) return;
+  if (!currentScore) return;
+
+  // If bubblesVisible is true but no bubble elements exist in the DOM,
+  // the state is stale (e.g. after a tab switch). Reset and re-render.
+  if (bubblesVisible) {
+    const existing = document.querySelectorAll<HTMLElement>(`.${BUBBLE_CLASS}`);
+    if (existing.length === 0) {
+      bubblesVisible = false;
+      stopMouseTracking();
+    } else {
+      return;
+    }
+  }
+
   bubblesVisible = true;
 
   const badgeRect = badge.getBoundingClientRect();
@@ -334,16 +347,23 @@ export function renderOverlay(score: LiveScore, inputEl: HTMLElement, platform?:
       z-index: ${BADGE_Z};
       cursor: default;
       pointer-events: auto;
-      transition: opacity 0.2s, border-color 0.2s;
+      opacity: 0;
+      transition: opacity 0.2s ease, border-color 0.2s ease;
     `;
     badge.addEventListener('mouseenter', () => showBubbles(badge!));
     document.body.appendChild(badge);
+
+    // Fade in — start transparent, then transition to visible
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        badge!.style.opacity = '1';
+      });
+    });
   }
 
   const color = getScoreColor(score.overall);
   badge.style.color = color;
   badge.style.borderColor = `${color}99`;
-  badge.style.opacity = '1';
   badge.textContent = String(score.overall);
 
   requestAnimationFrame(() => positionBadge(badge!, inputBar));
@@ -357,3 +377,15 @@ export function hideOverlay(): void {
     setTimeout(() => badge.remove(), 200);
   }
 }
+
+// When the tab is hidden, bubble DOM nodes may be cleaned up by the browser
+// or simply become stale. Reset all state so hovering the badge on return
+// always shows fresh bubbles.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // Tab is being hidden — tear down bubbles and reset state cleanly
+    stopMouseTracking();
+    document.querySelectorAll<HTMLElement>(`.${BUBBLE_CLASS}`).forEach(b => b.remove());
+    bubblesVisible = false;
+  }
+});
