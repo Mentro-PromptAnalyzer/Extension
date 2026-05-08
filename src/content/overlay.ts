@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // Score badge UI — main circle badge, fans out 4 sub-bubbles with score rings.
 // Each sub-bubble has a thin SVG arc showing score 0-100 = 0-360deg.
+// Also renders 3 feedback pills that fly up from the input bar.
 // ---------------------------------------------------------------------------
 
 import type { LiveScore } from '../analysis/engine';
@@ -10,6 +11,8 @@ const BADGE_ID = 'askbetter-badge';
 const BUBBLE_CLASS = 'askbetter-bubble';
 const PULSE_STYLE_ID = 'askbetter-pulse-style';
 const PULSE_CLASS = 'askbetter-pulsing';
+const FEEDBACK_CLASS = 'askbetter-feedback-pill';
+const FEEDBACK_STYLE_ID = 'askbetter-feedback-style';
 const BASE_Z = 999998;
 const BADGE_Z = 999999;
 
@@ -316,6 +319,206 @@ function hideBubbles(): void {
     b.style.opacity = '0';
     b.style.transform = 'translate(0px, 0px) scale(0.5)';
     setTimeout(() => b.remove(), 220);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Feedback pills — 3 bullet suggestions that fly up from the input bar
+// ---------------------------------------------------------------------------
+
+function injectFeedbackStyles(): void {
+  if (document.getElementById(FEEDBACK_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = FEEDBACK_STYLE_ID;
+  style.textContent = `
+    @keyframes askbetter-fly-up {
+      0%   { opacity: 0; transform: translateY(18px) scale(0.92); }
+      60%  { opacity: 1; transform: translateY(-4px) scale(1.02); }
+      100% { opacity: 1; transform: translateY(0px) scale(1); }
+    }
+    @keyframes askbetter-fly-down {
+      0%   { opacity: 1; transform: translateY(0px) scale(1); }
+      100% { opacity: 0; transform: translateY(14px) scale(0.92); }
+    }
+    .${FEEDBACK_CLASS} {
+      animation: askbetter-fly-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .${FEEDBACK_CLASS}.hiding {
+      animation: askbetter-fly-down 0.22s ease-in both;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+let feedbackVisible = false;
+
+// Pending feedback — stored when Ollama responds, rendered on input bar hover
+let pendingSuggestions: string[] = [];
+let pendingScores: Pick<LiveScore, 'ownership' | 'depth' | 'critical' | 'clarity'> | null = null;
+let pendingInputEl: HTMLElement | null = null;
+let pendingPlatform: PlatformConfig | undefined;
+
+// Input bar hover listeners — kept so we can remove them on re-attach
+let inputBarHoverEl: HTMLElement | null = null;
+let inputBarEnterListener: (() => void) | null = null;
+let inputBarLeaveListener: (() => void) | null = null;
+let mouseInsideInputBar = false;
+
+function showPendingPills(): void {
+  console.log('[AskBetter:pills] mouseenter fired — pendingScores:', pendingScores, 'suggestions:', pendingSuggestions, 'inputEl:', pendingInputEl);
+  if (!pendingScores || pendingSuggestions.length === 0 || !pendingInputEl) {
+    console.log('[AskBetter:pills] showPendingPills bailed — missing data');
+    return;
+  }
+  injectFeedbackStyles();
+
+  // Remove any existing pill DOM nodes without touching pending state
+  document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`).forEach(p => p.remove());
+  feedbackVisible = true;
+
+  // Use the already-resolved input bar element for positioning
+  const inputBar = inputBarHoverEl ?? findInputBar(pendingInputEl, pendingPlatform);
+  const rect = inputBar.getBoundingClientRect();
+  console.log('[AskBetter:pills] rendering pills at rect:', rect.left, rect.top, rect.width);
+
+  const dimOrder: (keyof typeof pendingScores)[] = ['ownership', 'depth', 'critical', 'clarity'];
+  const lowDims = dimOrder.filter(k => pendingScores![k] < 60);
+
+  pendingSuggestions.slice(0, 3).forEach((text, i) => {
+    const isGreen = lowDims.length === 0 || (lowDims[i] === undefined);
+    const color = isGreen ? '#4ade80' : '#f87171';
+    const glowColor = isGreen ? 'rgba(74, 222, 128, 0.18)' : 'rgba(248, 113, 113, 0.18)';
+    const borderColor = isGreen ? 'rgba(74, 222, 128, 0.35)' : 'rgba(248, 113, 113, 0.35)';
+
+    const pill = document.createElement('div');
+    pill.className = FEEDBACK_CLASS;
+
+    pill.style.cssText = `
+      position: fixed;
+      left: ${rect.left + 12}px;
+      top: ${rect.top - 44 - i * 40}px;
+      max-width: ${Math.min(rect.width - 24, 520)}px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%);
+      border: 1px solid ${borderColor};
+      border-top: 1px solid rgba(255,255,255,0.18);
+      border-radius: 20px;
+      padding: 7px 14px 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: ${color};
+      box-shadow: 0 0 20px 3px ${glowColor}, 0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+      z-index: ${BADGE_Z + 10 + i};
+      pointer-events: auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      animation-delay: ${i * 60}ms;
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      cursor: default;
+    `;
+
+    const dot = document.createElement('span');
+    dot.style.cssText = `
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: ${color};
+      flex-shrink: 0;
+      box-shadow: 0 0 6px 1px ${color}88;
+    `;
+
+    const label = document.createElement('span');
+    label.textContent = text;
+
+    pill.appendChild(dot);
+    pill.appendChild(label);
+    document.body.appendChild(pill);
+  });
+}
+
+/**
+ * Attach mouseenter/mouseleave listeners to the input bar element so pills
+ * appear on hover and disappear when the mouse leaves.
+ * Safe to call multiple times — removes previous listeners first.
+ */
+export function attachInputBarHover(inputEl: HTMLElement, platform?: PlatformConfig): void {
+  // Remove previous listeners if re-attaching
+  if (inputBarHoverEl && inputBarEnterListener && inputBarLeaveListener) {
+    inputBarHoverEl.removeEventListener('mouseenter', inputBarEnterListener);
+    inputBarHoverEl.removeEventListener('mouseleave', inputBarLeaveListener);
+  }
+
+  const inputBar = findInputBar(inputEl, platform);
+  console.log('[AskBetter:pills] attachInputBarHover — resolved inputBar:', inputBar.tagName, inputBar.className.slice(0, 80));
+  inputBarHoverEl = inputBar;
+
+  inputBarEnterListener = () => { mouseInsideInputBar = true; showPendingPills(); };
+  inputBarLeaveListener = () => { mouseInsideInputBar = false; hideFeedback(); };
+
+  inputBar.addEventListener('mouseenter', inputBarEnterListener);
+  inputBar.addEventListener('mouseleave', inputBarLeaveListener);
+
+  // On page load the mouse may already be over the input bar without a
+  // mouseenter ever firing — seed the flag using :hover.
+  if (inputBar.matches(':hover')) {
+    mouseInsideInputBar = true;
+  }
+}
+
+/**
+ * Store feedback from Ollama/heuristic. Pills will show on next input bar hover.
+ */
+export function renderFeedback(
+  suggestions: string[],
+  scores: Pick<LiveScore, 'ownership' | 'depth' | 'critical' | 'clarity'>,
+  inputEl: HTMLElement,
+  platform?: PlatformConfig,
+): void {
+  console.log('[AskBetter:pills] renderFeedback called — suggestions:', suggestions, 'scores:', scores);
+  // Save pending state — pills render on hover, not immediately.
+  // Also dismiss any currently visible pills so they refresh on next hover.
+  pendingSuggestions = suggestions;
+  pendingScores = scores;
+  pendingInputEl = inputEl;
+  pendingPlatform = platform;
+  if (feedbackVisible) {
+    document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`).forEach(p => p.remove());
+    feedbackVisible = false;
+  }
+  // If the mouse is already inside the input bar, show pills immediately
+  if (mouseInsideInputBar) {
+    showPendingPills();
+  }
+}
+
+export function hideFeedback(instant = false): void {
+  if (!feedbackVisible && !instant) return;
+  feedbackVisible = false;
+
+  // Only clear pending state when explicitly resetting (user started typing),
+  // not on a normal mouseleave hide — pending should survive hover cycles.
+  if (instant) {
+    pendingSuggestions = [];
+    pendingScores = null;
+    pendingInputEl = null;
+  }
+
+  const pills = document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`);
+  if (pills.length === 0) return;
+
+  if (instant) {
+    pills.forEach(p => p.remove());
+    return;
+  }
+
+  pills.forEach(p => {
+    p.classList.add('hiding');
+    setTimeout(() => p.remove(), 240);
   });
 }
 

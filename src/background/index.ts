@@ -58,10 +58,10 @@ Reasoning: Clear question with language/tool context (clarity=62), asks "how" sh
 Also provide:
 - overall: weighted average (ownership 25%, depth 25%, critical 25%, clarity 25%), rounded to nearest integer
 - intent: one of "delegation" | "curiosity" | "collaborative" | "verification"
-- suggestions: array of 1-3 short, specific, actionable improvement tips (each under 80 chars). Empty array if overall >= 75.
+- suggestions: array of exactly 1-3 short, specific, actionable improvement tips (each under 80 chars). You MUST provide suggestions if overall < 75. Only use an empty array if overall >= 75.
 
 Respond with ONLY valid JSON, no markdown, no explanation:
-{"ownership":N,"depth":N,"critical":N,"clarity":N,"overall":N,"intent":"...","suggestions":["..."]}`;
+{"ownership":N,"depth":N,"critical":N,"clarity":N,"overall":N,"intent":"...","suggestions":["tip1","tip2","tip3"]}`;
 
 function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));

@@ -5,7 +5,7 @@
 
 import { detectPlatform, findInputElement, getInputText } from './selectors';
 import { analyzePrompt } from '../analysis/engine';
-import { renderOverlay, hideOverlay, setBadgeLoading } from './overlay';
+import { renderOverlay, hideOverlay, setBadgeLoading, renderFeedback, hideFeedback, attachInputBarHover } from './overlay';
 import { scoreWithOllama } from '../analysis/ollama';
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -28,26 +28,42 @@ function safeSendMessage(message: object): void {
 // responses don't overwrite a newer score.
 let currentOllamaGen = 0;
 
+// Last text that was fully scored — used to detect real input changes vs
+// observer noise (observer + input + keyup all fire for a single keystroke).
+let lastScoredText = '';
+
 function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatform>): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   if (ollamaTimer) clearTimeout(ollamaTimer);
 
-  // Cancel pulse immediately if the user resumes typing
-  if (pulseTimer) { clearTimeout(pulseTimer); pulseTimer = null; }
-  setBadgeLoading(false);
+  // Peek at current text before the debounce to decide if pills should hide.
+  // Only hide if the text has actually changed from what was last scored —
+  // this filters out the burst of observer/input/keyup events that all fire
+  // for a single keystroke, which would otherwise kill freshly rendered pills.
+  const currentText = getInputText(el);
+  if (currentText !== lastScoredText) {
+    // Cancel pulse immediately if the user resumes typing
+    if (pulseTimer) { clearTimeout(pulseTimer); pulseTimer = null; }
+    setBadgeLoading(false);
+    hideFeedback();
+  }
 
   debounceTimer = setTimeout(() => {
     const text = getInputText(el);
     console.log('[AskBetter] input change, text length:', text.length, 'trimmed:', text.trim().length, JSON.stringify(text.slice(0, 50)));
 
     if (text.trim().length < 5) {
+      lastScoredText = '';
       hideOverlay();
+      hideFeedback();
       return;
     }
 
     // Layer 1: instant heuristic score
     const heuristicScore = analyzePrompt(text);
+    lastScoredText = text; // mark this text as scored so observer noise doesn't hide pills
     renderOverlay(heuristicScore, el, platform ?? undefined);
+    // Pills are held until Ollama responds — renderFeedback is called in scheduleOllamaScore
     safeSendMessage({ type: 'SCORE_UPDATE', score: heuristicScore });
 
     // Bump gen once, here, after the heuristic fires
@@ -84,16 +100,26 @@ async function scheduleOllamaScore(
   setBadgeLoading(false);
 
   if (!aiScore) {
-    console.log('[AskBetter] Ollama unavailable or returned invalid response');
+    console.log('[AskBetter] Ollama unavailable or returned invalid response — falling back to heuristic suggestions');
+    // Ollama not running — still show heuristic suggestions so pills aren't empty
+    renderFeedback(heuristicScore.suggestions, heuristicScore, el, platform ?? undefined);
     return;
   }
 
   // Merge AI scores over the heuristic base — flags come from heuristic,
   // everything else (scores, intent, suggestions) comes from Ollama.
-  const merged = { ...heuristicScore, ...aiScore };
+  // If Ollama returned empty suggestions, fall back to heuristic ones.
+  const merged = {
+    ...heuristicScore,
+    ...aiScore,
+    suggestions: (aiScore.suggestions && aiScore.suggestions.length > 0)
+      ? aiScore.suggestions
+      : heuristicScore.suggestions,
+  };
 
   console.log('[AskBetter] Ollama score received:', merged.overall);
   renderOverlay(merged, el, platform ?? undefined);
+  renderFeedback(merged.suggestions, merged, el, platform ?? undefined);
   safeSendMessage({ type: 'SCORE_UPDATE', score: merged });
 }
 
@@ -112,6 +138,9 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
 
   // Score immediately — text may already be present
   onInputChange(input, platform);
+
+  // Attach hover listeners to the input bar for pill reveal
+  attachInputBarHover(input, platform ?? undefined);
 
   // MutationObserver for contenteditable changes
   const observer = new MutationObserver(() => {

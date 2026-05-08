@@ -32,3 +32,5 @@ Prompts are classified into one of four intents: `delegation`, `curiosity`, `col
 ## UI
 
 A floating badge (score circle) appears next to the input bar. Hovering fans out four sub-bubbles with SVG arc rings showing per-dimension scores. While Ollama is scoring, the badge border pulses purple to signal a score update is pending. The popup shows the latest score when the extension icon is clicked.
+
+**Feedback pills** — up to 3 suggestion pills appear above the input bar when the user hovers over it. Pills are stored as pending state after Ollama responds (or heuristic fallback) and rendered on `mouseenter` of the input bar; they hide on `mouseleave`. Pending state is cleared when the user starts typing a new prompt. Each pill is a bullet point with text from `LiveScore.suggestions`. Color is red (`#f87171`) for dimensions scoring below 60, green (`#4ade80`) when all dimensions are healthy. Pills have a matching color glow and glass-style background (backdrop-filter blur).
