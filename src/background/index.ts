@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import type { LiveScore } from '../analysis/engine';
+import type { HeuristicContext } from '../analysis/ollama';
 
 interface ScoreMessage {
   type: 'SCORE_UPDATE';
@@ -22,6 +23,7 @@ interface PromptMessage {
 interface OllamaRequest {
   type: 'OLLAMA_SCORE';
   text: string;
+  heuristic?: HeuristicContext;
 }
 
 type Message = ScoreMessage | PromptMessage | OllamaRequest;
@@ -58,7 +60,16 @@ Reasoning: Clear question with language/tool context (clarity=62), asks "how" sh
 Also provide:
 - overall: weighted average (ownership 25%, depth 25%, critical 25%, clarity 25%), rounded to nearest integer
 - intent: one of "delegation" | "curiosity" | "collaborative" | "verification"
-- suggestions: array of exactly 1-3 short, specific, actionable improvement tips (each under 80 chars). You MUST provide suggestions if overall < 75. Only use an empty array if overall >= 75.
+- suggestions: array of exactly 1-3 improvement tips. Rules for suggestions:
+  * Each tip must be a concrete, specific question or phrase the user could literally add to their prompt.
+  * Each tip must reference the actual subject matter of the prompt — never give generic advice.
+  * Each tip must target a DIFFERENT weak dimension (ownership, depth, critical, or clarity).
+  * Keep each tip under 90 characters.
+  * Bad example (too generic): "Add more context to your prompt."
+  * Good example (specific): "What have you already tried with the BFS implementation? Share your current code."
+  * Bad example (too generic): "Ask about edge cases."
+  * Good example (specific): "What should BFS do when the graph has cycles or disconnected nodes?"
+  * You MUST provide suggestions if overall < 75. Only use an empty array if overall >= 75.
 
 Respond with ONLY valid JSON, no markdown, no explanation:
 {"ownership":N,"depth":N,"critical":N,"clarity":N,"overall":N,"intent":"...","suggestions":["tip1","tip2","tip3"]}`;
@@ -67,22 +78,47 @@ function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-async function fetchOllamaScore(text: string): Promise<Partial<LiveScore> | null> {
+async function fetchOllamaScore(text: string, heuristic?: HeuristicContext): Promise<Partial<LiveScore> | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
     console.log('[AskBetter:bg] Fetching from Ollama...');
     const t0 = Date.now();
+
+    // Build a pre-analysis block from heuristic data so Ollama doesn't
+    // waste tokens re-deriving what we already know, and can focus on
+    // generating grounded, specific suggestions.
+    let preAnalysis = '';
+    if (heuristic) {
+      const weakDims = Object.entries(heuristic.scores)
+        .filter(([k, v]) => k !== 'overall' && v < 60)
+        .sort(([, a], [, b]) => a - b)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ');
+      const flagList = heuristic.flags.length > 0 ? heuristic.flags.join(', ') : 'none';
+      const topicList = heuristic.topics.length > 0 ? heuristic.topics.join(', ') : 'unknown';
+      preAnalysis = `
+Pre-analysis from heuristic scorer (use this to inform your suggestions):
+- Detected intent: ${heuristic.intent}
+- Key topics identified: ${topicList}
+- Heuristic scores: ownership=${heuristic.scores.ownership}, depth=${heuristic.scores.depth}, critical=${heuristic.scores.critical}, clarity=${heuristic.scores.clarity}, overall=${heuristic.scores.overall}
+- Weakest dimensions: ${weakDims || 'none'}
+- Detected signals: ${flagList}
+
+Use the key topics and weak dimensions above to write suggestions that are specific to THIS prompt.
+`;
+    }
+
     const res = await fetch(OLLAMA_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
         model: MODEL,
-        prompt: `${SYSTEM_PROMPT}\n\nPrompt to evaluate:\n${text}`,
+        prompt: `${SYSTEM_PROMPT}${preAnalysis}\n\nPrompt to evaluate:\n${text}`,
         stream: false,
-        options: { temperature: 0.1, num_predict: 200 },
+        options: { temperature: 0.1, num_predict: 350 },
       }),
     });
 
@@ -163,7 +199,7 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
 
   if (message.type === 'OLLAMA_SCORE') {
     // Proxy the Ollama fetch and return the result asynchronously
-    fetchOllamaScore(message.text).then(score => {
+    fetchOllamaScore(message.text, message.heuristic).then(score => {
       sendResponse({ score });
     });
     return true; // keep message channel open for async response

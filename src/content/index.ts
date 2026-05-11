@@ -4,9 +4,10 @@
 // ---------------------------------------------------------------------------
 
 import { detectPlatform, findInputElement, getInputText } from './selectors';
-import { analyzePrompt } from '../analysis/engine';
+import { analyzePrompt, STOP_WORDS } from '../analysis/engine';
 import { renderOverlay, hideOverlay, setBadgeLoading, renderFeedback, hideFeedback, attachInputBarHover } from './overlay';
 import { scoreWithOllama } from '../analysis/ollama';
+import { extractTopicsTFIDF } from '../analysis/tfidf';
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let ollamaTimer: ReturnType<typeof setTimeout> | null = null;
@@ -55,7 +56,7 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
     if (text.trim().length < 5) {
       lastScoredText = '';
       hideOverlay();
-      hideFeedback();
+      hideFeedback(true); // clear pending state so hovering an empty bar shows nothing
       return;
     }
 
@@ -91,7 +92,23 @@ async function scheduleOllamaScore(
 ): Promise<void> {
   console.log('[AskBetter] Ollama scoring started');
 
-  const aiScore = await scoreWithOllama(text);
+  // Build heuristic context to send alongside the raw text — Ollama uses
+  // this to skip re-deriving intent/topics and focus on specific suggestions.
+  const topics = extractTopicsTFIDF(text, STOP_WORDS, 3);
+  const heuristicContext = {
+    intent: heuristicScore.intent,
+    flags: heuristicScore.flags,
+    scores: {
+      ownership: heuristicScore.ownership,
+      depth: heuristicScore.depth,
+      critical: heuristicScore.critical,
+      clarity: heuristicScore.clarity,
+      overall: heuristicScore.overall,
+    },
+    topics,
+  };
+
+  const aiScore = await scoreWithOllama(text, heuristicContext);
 
   // If the user kept typing, a newer generation is running — discard this result
   if (gen !== currentOllamaGen) return;

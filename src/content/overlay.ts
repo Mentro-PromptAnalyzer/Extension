@@ -1,42 +1,36 @@
 // ---------------------------------------------------------------------------
-// Score badge UI — main circle badge, fans out 4 sub-bubbles with score rings.
-// Each sub-bubble has a thin SVG arc showing score 0-100 = 0-360deg.
-// Also renders 3 feedback pills that fly up from the input bar.
+// Score badge UI — circle badge, 4 metric circles stack vertically above on hover.
+// Each circle has a glass background, SVG arc ring, score number, and label.
+// Also renders 3 feedback pills that fly up from the input bar on hover.
 // ---------------------------------------------------------------------------
 
 import type { LiveScore } from '../analysis/engine';
 import type { PlatformConfig } from './selectors';
 
 const BADGE_ID = 'askbetter-badge';
+const BADGE_LABEL_ID = 'askbetter-badge-label';
 const BUBBLE_CLASS = 'askbetter-bubble';
 const PULSE_STYLE_ID = 'askbetter-pulse-style';
 const PULSE_CLASS = 'askbetter-pulsing';
 const FEEDBACK_CLASS = 'askbetter-feedback-pill';
 const FEEDBACK_STYLE_ID = 'askbetter-feedback-style';
-const BASE_Z = 999998;
+const FEEDBACK_BRIDGE_ID = 'askbetter-feedback-bridge';
 const BADGE_Z = 999999;
+const BASE_Z = 999998;
 
-// Sub-bubble sizing
-const BUBBLE_SIZE = 44;       // outer diameter of the SVG
-const INNER_R = 14;           // radius of the dark circle inside
-const RING_R = 19;            // radius of the progress arc
+// Bubble sizing
+const BUBBLE_SIZE = 48;
+const INNER_R = 15;
+const RING_R = 20;
 const RING_STROKE = 3;
+const BUBBLE_GAP = 8; // px between bubbles
 
-// Wider spacing so bubbles never overlap
-const ARC = [
-  { x: -72, y: -70 },
-  { x: -24, y: -88 },
-  { x:  24, y: -88 },
-  { x:  72, y: -70 },
-];
-
+const BRIDGE_ID = 'askbetter-bridge';
 const LABELS = ['Ownership', 'Depth', 'Critical', 'Clarity'];
 const KEYS: (keyof LiveScore)[] = ['ownership', 'depth', 'critical', 'clarity'];
 
 let currentScore: LiveScore | null = null;
 let bubblesVisible = false;
-let mouseMoveListener: ((e: MouseEvent) => void) | null = null;
-let hullPoints: [number, number][] = [];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,123 +55,152 @@ function findInputBar(inputEl: HTMLElement, _platform?: PlatformConfig): HTMLEle
 
 function positionBadge(badge: HTMLElement, inputBar: HTMLElement): void {
   const rect = inputBar.getBoundingClientRect();
-  const size = 36;
+  const size = 48;
   badge.style.top = `${rect.top + rect.height / 2 - size / 2}px`;
   badge.style.left = `${rect.left - size - 10}px`;
 }
 
 // ---------------------------------------------------------------------------
-// Point-in-polygon & convex hull
+// Bubble styles
 // ---------------------------------------------------------------------------
 
-function pointInPolygon(x: number, y: number, poly: [number, number][]): boolean {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const xi = poly[i][0], yi = poly[i][1];
-    const xj = poly[j][0], yj = poly[j][1];
-    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
-function convexHull(points: [number, number][]): [number, number][] {
-  if (points.length < 3) return points;
-  const pts = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  const lower: [number, number][] = [];
-  for (const p of pts) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0)
-      lower.pop();
-    lower.push(p);
-  }
-  const upper: [number, number][] = [];
-  for (const p of [...pts].reverse()) {
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0)
-      upper.pop();
-    upper.push(p);
-  }
-  upper.pop();
-  lower.pop();
-  return [...lower, ...upper];
-}
-
-function buildHull(badgeCx: number, badgeCy: number): [number, number][] {
-  const pad = 24;
-  const badgeR = 18 + pad;
-  const allPoints: [number, number][] = [
-    [badgeCx - badgeR, badgeCy - badgeR],
-    [badgeCx + badgeR, badgeCy - badgeR],
-    [badgeCx + badgeR, badgeCy + badgeR],
-    [badgeCx - badgeR, badgeCy + badgeR],
-  ];
-  ARC.forEach(off => {
-    const cx = badgeCx + off.x;
-    const cy = badgeCy + off.y;
-    // Include label space below each bubble
-    const r = BUBBLE_SIZE / 2 + pad;
-    allPoints.push([cx - r, cy - r]);
-    allPoints.push([cx + r, cy - r]);
-    allPoints.push([cx + r, cy + r + 18]); // +18 for label
-    allPoints.push([cx - r, cy + r + 18]);
-  });
-  return convexHull(allPoints);
+function injectBubbleStyles(): void {
+  if (document.getElementById('askbetter-bubble-style')) return;
+  const style = document.createElement('style');
+  style.id = 'askbetter-bubble-style';
+  style.textContent = `
+    .${BUBBLE_CLASS} {
+      position: fixed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      width: ${BUBBLE_SIZE}px;
+      overflow: visible;
+      pointer-events: auto;
+      cursor: default;
+      z-index: ${BASE_Z};
+      opacity: 0;
+      transform: translateY(12px) scale(0.85);
+      transition: opacity 0.25s cubic-bezier(0.22,1,0.36,1),
+                  transform 0.25s cubic-bezier(0.22,1,0.36,1);
+    }
+    .${BUBBLE_CLASS}.visible {
+      opacity: 1;
+      transform: translateY(0px) scale(1);
+    }
+    .askbetter-bubble-svg {
+      transition: filter 0.15s ease;
+      flex-shrink: 0;
+    }
+    .askbetter-bubble-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 8px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: rgba(167,139,250,0.9);
+      white-space: nowrap;
+      pointer-events: none;
+      width: max-content;
+      text-align: center;
+      align-self: center;
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 // ---------------------------------------------------------------------------
-// Sub-bubble SVG with score ring
+// Make a single glass bubble
 // ---------------------------------------------------------------------------
 
-function makeBubbleSVG(value: number, index: number): HTMLElement {
+function makeBubble(value: number, index: number): HTMLElement {
   const color = getScoreColor(value);
   const circumference = 2 * Math.PI * RING_R;
   const filled = circumference * (value / 100);
   const gap = circumference - filled;
 
-  // Wrapper div (positions the SVG + label together)
   const wrapper = document.createElement('div');
   wrapper.className = BUBBLE_CLASS;
   wrapper.dataset.index = String(index);
-  wrapper.style.cssText = `
-    position: fixed;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    pointer-events: auto;
-    opacity: 0;
-    transform: translate(0px, 0px) scale(0.5);
-    transition: opacity 0.22s ease, transform 0.22s ease;
-    cursor: default;
-    z-index: ${BASE_Z};
-  `;
 
-  // SVG circle with progress ring
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('width', String(BUBBLE_SIZE));
   svg.setAttribute('height', String(BUBBLE_SIZE));
   svg.setAttribute('viewBox', `0 0 ${BUBBLE_SIZE} ${BUBBLE_SIZE}`);
-  svg.style.cssText = `
-    filter: drop-shadow(0 2px 8px ${color}44);
-    transition: filter 0.15s ease;
-  `;
+  svg.classList.add('askbetter-bubble-svg');
+  svg.style.filter = `drop-shadow(0 2px 10px ${color}55)`;
 
   const cx = BUBBLE_SIZE / 2;
   const cy = BUBBLE_SIZE / 2;
 
-  // Background track
+  // Glass background circle — score-color tint with purple border accent
+  const glassBg = document.createElementNS(svgNS, 'circle');
+  glassBg.setAttribute('cx', String(cx));
+  glassBg.setAttribute('cy', String(cy));
+  glassBg.setAttribute('r', String(INNER_R + 3));
+  glassBg.setAttribute('fill', `${color}18`);
+  glassBg.setAttribute('stroke', `${color}38`);
+  glassBg.setAttribute('stroke-width', '1');
+  svg.appendChild(glassBg);
+
+  // Purple inner ring accent
+  const purpleRing = document.createElementNS(svgNS, 'circle');
+  purpleRing.setAttribute('cx', String(cx));
+  purpleRing.setAttribute('cy', String(cy));
+  purpleRing.setAttribute('r', String(INNER_R + 3));
+  purpleRing.setAttribute('fill', 'none');
+  purpleRing.setAttribute('stroke', 'rgba(167,139,250,0.18)');
+  purpleRing.setAttribute('stroke-width', '1.5');
+  svg.appendChild(purpleRing);
+
+  // Glass highlight (top-left arc shimmer)
+  const highlight = document.createElementNS(svgNS, 'circle');
+  highlight.setAttribute('cx', String(cx));
+  highlight.setAttribute('cy', String(cy));
+  highlight.setAttribute('r', String(INNER_R + 3));
+  highlight.setAttribute('fill', 'url(#askbetter-glass-grad)');
+  svg.appendChild(highlight);
+
+  // Define gradient once in a standalone hidden SVG on body
+  if (!document.getElementById('askbetter-glass-defs')) {
+    const defsSvg = document.createElementNS(svgNS, 'svg');
+    defsSvg.setAttribute('id', 'askbetter-glass-defs');
+    defsSvg.setAttribute('width', '0');
+    defsSvg.setAttribute('height', '0');
+    defsSvg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+    const defs = document.createElementNS(svgNS, 'defs');
+    const grad = document.createElementNS(svgNS, 'linearGradient');
+    grad.setAttribute('id', 'askbetter-glass-grad');
+    grad.setAttribute('x1', '0%');
+    grad.setAttribute('y1', '0%');
+    grad.setAttribute('x2', '60%');
+    grad.setAttribute('y2', '100%');
+    const s1 = document.createElementNS(svgNS, 'stop');
+    s1.setAttribute('offset', '0%');
+    s1.setAttribute('stop-color', 'rgba(255,255,255,0.18)');
+    const s2 = document.createElementNS(svgNS, 'stop');
+    s2.setAttribute('offset', '100%');
+    s2.setAttribute('stop-color', 'rgba(255,255,255,0.02)');
+    grad.appendChild(s1);
+    grad.appendChild(s2);
+    defs.appendChild(grad);
+    defsSvg.appendChild(defs);
+    document.body.appendChild(defsSvg);
+  }
+
+  // Arc track — purple tint
   const track = document.createElementNS(svgNS, 'circle');
   track.setAttribute('cx', String(cx));
   track.setAttribute('cy', String(cy));
   track.setAttribute('r', String(RING_R));
   track.setAttribute('fill', 'none');
-  track.setAttribute('stroke', 'rgba(255,255,255,0.07)');
+  track.setAttribute('stroke', 'rgba(167,139,250,0.20)');
   track.setAttribute('stroke-width', String(RING_STROKE));
   svg.appendChild(track);
 
-  // Progress arc — starts from top (-90deg rotation)
+  // Progress arc
   const arc = document.createElementNS(svgNS, 'circle');
   arc.setAttribute('cx', String(cx));
   arc.setAttribute('cy', String(cy));
@@ -190,14 +213,6 @@ function makeBubbleSVG(value: number, index: number): HTMLElement {
   arc.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
   arc.style.transition = 'stroke-dasharray 0.4s ease';
   svg.appendChild(arc);
-
-  // Inner dark circle
-  const inner = document.createElementNS(svgNS, 'circle');
-  inner.setAttribute('cx', String(cx));
-  inner.setAttribute('cy', String(cy));
-  inner.setAttribute('r', String(INNER_R));
-  inner.setAttribute('fill', 'rgba(15, 10, 30, 0.95)');
-  svg.appendChild(inner);
 
   // Score number
   const text = document.createElementNS(svgNS, 'text');
@@ -216,109 +231,134 @@ function makeBubbleSVG(value: number, index: number): HTMLElement {
 
   // Label below
   const label = document.createElement('div');
-  label.style.cssText = `
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #a78bfa;
-    white-space: nowrap;
-    pointer-events: none;
-  `;
+  label.className = 'askbetter-bubble-label';
   label.textContent = LABELS[index];
   wrapper.appendChild(label);
 
-  // Hover: raise z + glow
+  // Hover glow + dismiss when leaving the entire widget
   wrapper.addEventListener('mouseenter', () => {
-    wrapper.style.zIndex = String(BADGE_Z + 1);
-    svg.style.filter = `drop-shadow(0 3px 14px ${color}88)`;
-    document.querySelectorAll<HTMLElement>(`.${BUBBLE_CLASS}`).forEach(b => {
-      if (b !== wrapper) b.style.zIndex = String(BASE_Z - 1);
-    });
+    svg.style.filter = `drop-shadow(0 3px 16px ${color}88)`;
   });
-
-  wrapper.addEventListener('mouseleave', () => {
-    svg.style.filter = `drop-shadow(0 2px 8px ${color}44)`;
-    document.querySelectorAll<HTMLElement>(`.${BUBBLE_CLASS}`).forEach(b => {
-      b.style.zIndex = String(BASE_Z);
-    });
+  wrapper.addEventListener('mouseleave', (e: MouseEvent) => {
+    svg.style.filter = `drop-shadow(0 2px 10px ${color}55)`;
+    const rel = e.relatedTarget as HTMLElement | null;
+    // Stay open if moving to another bubble, the bridge, or the badge
+    if (
+      rel?.closest(`.${BUBBLE_CLASS}`) ||
+      rel?.id === BRIDGE_ID ||
+      rel?.id === BADGE_ID
+    ) return;
+    hideBubbles();
   });
 
   return wrapper;
 }
 
 // ---------------------------------------------------------------------------
-// Show / hide
+// Show / hide bubbles
 // ---------------------------------------------------------------------------
-
-function startMouseTracking(): void {
-  if (mouseMoveListener) return;
-  mouseMoveListener = (e: MouseEvent) => {
-    if (!bubblesVisible) return;
-    if (!pointInPolygon(e.clientX, e.clientY, hullPoints)) hideBubbles();
-  };
-  document.addEventListener('mousemove', mouseMoveListener);
-}
-
-function stopMouseTracking(): void {
-  if (mouseMoveListener) {
-    document.removeEventListener('mousemove', mouseMoveListener);
-    mouseMoveListener = null;
-  }
-}
 
 function showBubbles(badge: HTMLElement): void {
   if (!currentScore) return;
-
-  // If bubblesVisible is true but no bubble elements exist in the DOM,
-  // the state is stale (e.g. after a tab switch). Reset and re-render.
   if (bubblesVisible) {
-    const existing = document.querySelectorAll<HTMLElement>(`.${BUBBLE_CLASS}`);
-    if (existing.length === 0) {
-      bubblesVisible = false;
-      stopMouseTracking();
-    } else {
-      return;
-    }
+    if (document.querySelectorAll(`.${BUBBLE_CLASS}`).length > 0) return;
+    bubblesVisible = false;
   }
 
+  injectBubbleStyles();
   bubblesVisible = true;
 
   const badgeRect = badge.getBoundingClientRect();
   const badgeCx = badgeRect.left + badgeRect.width / 2;
-  const badgeCy = badgeRect.top + badgeRect.height / 2;
+  const badgeTop = badgeRect.top;
 
-  hullPoints = buildHull(badgeCx, badgeCy);
-  startMouseTracking();
+  const rowH = BUBBLE_SIZE + 11 + BUBBLE_GAP;
+  // Total height of the bubble stack
+  const stackH = KEYS.length * rowH - BUBBLE_GAP;
+  // Top of the topmost bubble
+  const stackTop = badgeTop - BUBBLE_GAP - stackH;
+
+  // "OVERALL" label below the badge — fades in with the bubbles
+  const badgeLabel = document.createElement('div');
+  badgeLabel.id = BADGE_LABEL_ID;
+  badgeLabel.textContent = 'OVERALL';
+  badgeLabel.style.cssText = `
+    position: fixed;
+    left: ${badgeCx}px;
+    top: ${badgeRect.bottom + 4}px;
+    transform: translateX(-50%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(167,139,250,0.9);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: ${BADGE_Z};
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  `;
+  document.body.appendChild(badgeLabel);
+  // Fade in after a frame so transition fires
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    badgeLabel.style.opacity = '1';
+  }));
 
   KEYS.forEach((key, i) => {
     const value = currentScore![key] as number;
-    const wrapper = makeBubbleSVG(value, i);
+    const bubble = makeBubble(value, i);
 
-    // Start at badge center (offset by half bubble size)
-    wrapper.style.left = `${badgeCx - BUBBLE_SIZE / 2}px`;
-    wrapper.style.top = `${badgeCy - BUBBLE_SIZE / 2}px`;
-    document.body.appendChild(wrapper);
+    const stackIndex = KEYS.length - 1 - i;
+    const bottomY = badgeTop - BUBBLE_GAP - (stackIndex * rowH);
+    const leftX = badgeCx - BUBBLE_SIZE / 2;
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        wrapper.style.opacity = '1';
-        wrapper.style.transform = `translate(${ARC[i].x}px, ${ARC[i].y}px) scale(1)`;
-      });
-    });
+    bubble.style.left = `${leftX}px`;
+    bubble.style.top = `${bottomY - BUBBLE_SIZE - 11}px`;
+
+    document.body.appendChild(bubble);
+
+    setTimeout(() => bubble.classList.add('visible'), i * 40);
   });
+
+  // Invisible bridge covering the full column from badge top to stack top,
+  // so the mouse can travel between badge and bubbles without triggering hide.
+  const bridge = document.createElement('div');
+  bridge.id = BRIDGE_ID;
+  bridge.style.cssText = `
+    position: fixed;
+    left: ${badgeCx - BUBBLE_SIZE / 2}px;
+    top: ${stackTop}px;
+    width: ${BUBBLE_SIZE}px;
+    height: ${badgeRect.bottom - stackTop}px;
+    z-index: ${BASE_Z - 1};
+    pointer-events: auto;
+    background: transparent;
+  `;
+  bridge.addEventListener('mouseleave', (e: MouseEvent) => {
+    const rel = e.relatedTarget as HTMLElement | null;
+    if (rel?.closest(`.${BUBBLE_CLASS}`) || rel?.id === BADGE_ID) return;
+    hideBubbles();
+  });
+  document.body.appendChild(bridge);
 }
 
 function hideBubbles(): void {
   if (!bubblesVisible) return;
   bubblesVisible = false;
-  stopMouseTracking();
+
+  document.getElementById(BRIDGE_ID)?.remove();
+
+  // Fade out and remove the "OVERALL" label
+  const badgeLabel = document.getElementById(BADGE_LABEL_ID);
+  if (badgeLabel) {
+    badgeLabel.style.opacity = '0';
+    setTimeout(() => badgeLabel.remove(), 260);
+  }
 
   document.querySelectorAll<HTMLElement>(`.${BUBBLE_CLASS}`).forEach(b => {
-    b.style.opacity = '0';
-    b.style.transform = 'translate(0px, 0px) scale(0.5)';
-    setTimeout(() => b.remove(), 220);
+    b.classList.remove('visible');
+    setTimeout(() => b.remove(), 260);
   });
 }
 
@@ -342,6 +382,27 @@ function injectFeedbackStyles(): void {
     }
     .${FEEDBACK_CLASS} {
       animation: askbetter-fly-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+      /* Collapsed: single line, clipped */
+      max-height: 32px;
+      overflow: hidden;
+      transition: max-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+                  box-shadow 0.18s ease,
+                  z-index 0s;
+      white-space: nowrap;
+    }
+    .${FEEDBACK_CLASS}:hover {
+      /* Expanded: allow up to ~5 lines, float over pills above */
+      max-height: 120px;
+      white-space: normal;
+      overflow: visible;
+      z-index: ${BADGE_Z + 50} !important;
+    }
+    .${FEEDBACK_CLASS} .askbetter-pill-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: inherit;
+      display: block;
+      line-height: 1.4;
     }
     .${FEEDBACK_CLASS}.hiding {
       animation: askbetter-fly-down 0.22s ease-in both;
@@ -361,7 +422,7 @@ let pendingPlatform: PlatformConfig | undefined;
 // Input bar hover listeners — kept so we can remove them on re-attach
 let inputBarHoverEl: HTMLElement | null = null;
 let inputBarEnterListener: (() => void) | null = null;
-let inputBarLeaveListener: (() => void) | null = null;
+let inputBarLeaveListener: ((e: MouseEvent) => void) | null = null;
 let mouseInsideInputBar = false;
 
 function showPendingPills(): void {
@@ -372,11 +433,10 @@ function showPendingPills(): void {
   }
   injectFeedbackStyles();
 
-  // Remove any existing pill DOM nodes without touching pending state
   document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`).forEach(p => p.remove());
+  document.getElementById(FEEDBACK_BRIDGE_ID)?.remove();
   feedbackVisible = true;
 
-  // Use the already-resolved input bar element for positioning
   const inputBar = inputBarHoverEl ?? findInputBar(pendingInputEl, pendingPlatform);
   const rect = inputBar.getBoundingClientRect();
   console.log('[AskBetter:pills] rendering pills at rect:', rect.left, rect.top, rect.width);
@@ -400,7 +460,7 @@ function showPendingPills(): void {
       max-width: ${Math.min(rect.width - 24, 520)}px;
       background: linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%);
       border: 1px solid ${borderColor};
-      border-top: 1px solid rgba(255,255,255,0.18);
+      border-top: 1px solid rgba(167,139,250,0.30);
       border-radius: 20px;
       padding: 7px 14px 7px 10px;
       display: flex;
@@ -410,12 +470,9 @@ function showPendingPills(): void {
       font-size: 12px;
       font-weight: 500;
       color: ${color};
-      box-shadow: 0 0 20px 3px ${glowColor}, 0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.12);
+      box-shadow: 0 0 20px 3px ${glowColor}, 0 0 8px 1px rgba(167,139,250,0.10), 0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(167,139,250,0.12);
       z-index: ${BADGE_Z + 10 + i};
       pointer-events: auto;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
       animation-delay: ${i * 60}ms;
       backdrop-filter: blur(14px) saturate(160%);
       -webkit-backdrop-filter: blur(14px) saturate(160%);
@@ -433,21 +490,58 @@ function showPendingPills(): void {
     `;
 
     const label = document.createElement('span');
+    label.className = 'askbetter-pill-label';
     label.textContent = text;
 
     pill.appendChild(dot);
     pill.appendChild(label);
+
+    pill.addEventListener('mouseleave', (e: MouseEvent) => {
+      const rel = e.relatedTarget as HTMLElement | null;
+      // Stay open if moving to the input bar, the bridge, or another pill
+      if (
+        rel && (inputBarHoverEl?.contains(rel) || rel === inputBarHoverEl) ||
+        rel?.closest(`.${FEEDBACK_CLASS}`) ||
+        rel?.id === FEEDBACK_BRIDGE_ID
+      ) return;
+      mouseInsideInputBar = false;
+      hideFeedback();
+    });
+
     document.body.appendChild(pill);
   });
+
+  // Transparent bridge covering the gaps between pills and between the bottom
+  // pill and the input bar — same approach as the badge/bubble bridge.
+  // Spans from the top of the topmost pill down to the bottom of the input bar.
+  const pillCount = pendingSuggestions.slice(0, 3).length;
+  const topPillTop = rect.top - 44 - (pillCount - 1) * 40;
+  const bridgeWidth = Math.min(rect.width - 24, 520) + 24; // match pill max-width + left offset
+  const bridge = document.createElement('div');
+  bridge.id = FEEDBACK_BRIDGE_ID;
+  bridge.style.cssText = `
+    position: fixed;
+    left: ${rect.left}px;
+    top: ${topPillTop}px;
+    width: ${bridgeWidth}px;
+    height: ${rect.top - topPillTop}px;
+    z-index: ${BADGE_Z + 5};
+    pointer-events: auto;
+    background: transparent;
+  `;
+  bridge.addEventListener('mouseleave', (e: MouseEvent) => {
+    const rel = e.relatedTarget as HTMLElement | null;
+    if (
+      rel && (inputBarHoverEl?.contains(rel) || rel === inputBarHoverEl) ||
+      rel?.closest(`.${FEEDBACK_CLASS}`)
+    ) return;
+    mouseInsideInputBar = false;
+    hideFeedback();
+  });
+  document.body.appendChild(bridge);
 }
 
-/**
- * Attach mouseenter/mouseleave listeners to the input bar element so pills
- * appear on hover and disappear when the mouse leaves.
- * Safe to call multiple times — removes previous listeners first.
- */
 export function attachInputBarHover(inputEl: HTMLElement, platform?: PlatformConfig): void {
-  // Remove previous listeners if re-attaching
   if (inputBarHoverEl && inputBarEnterListener && inputBarLeaveListener) {
     inputBarHoverEl.removeEventListener('mouseenter', inputBarEnterListener);
     inputBarHoverEl.removeEventListener('mouseleave', inputBarLeaveListener);
@@ -458,21 +552,22 @@ export function attachInputBarHover(inputEl: HTMLElement, platform?: PlatformCon
   inputBarHoverEl = inputBar;
 
   inputBarEnterListener = () => { mouseInsideInputBar = true; showPendingPills(); };
-  inputBarLeaveListener = () => { mouseInsideInputBar = false; hideFeedback(); };
+  inputBarLeaveListener = (e: MouseEvent) => {
+    const rel = e.relatedTarget as HTMLElement | null;
+    // Don't hide if the mouse is moving onto a pill or the bridge — let those handle dismissal.
+    if (rel?.closest(`.${FEEDBACK_CLASS}`) || rel?.id === FEEDBACK_BRIDGE_ID) return;
+    mouseInsideInputBar = false;
+    hideFeedback();
+  };
 
   inputBar.addEventListener('mouseenter', inputBarEnterListener);
   inputBar.addEventListener('mouseleave', inputBarLeaveListener);
 
-  // On page load the mouse may already be over the input bar without a
-  // mouseenter ever firing — seed the flag using :hover.
   if (inputBar.matches(':hover')) {
     mouseInsideInputBar = true;
   }
 }
 
-/**
- * Store feedback from Ollama/heuristic. Pills will show on next input bar hover.
- */
 export function renderFeedback(
   suggestions: string[],
   scores: Pick<LiveScore, 'ownership' | 'depth' | 'critical' | 'clarity'>,
@@ -480,8 +575,6 @@ export function renderFeedback(
   platform?: PlatformConfig,
 ): void {
   console.log('[AskBetter:pills] renderFeedback called — suggestions:', suggestions, 'scores:', scores);
-  // Save pending state — pills render on hover, not immediately.
-  // Also dismiss any currently visible pills so they refresh on next hover.
   pendingSuggestions = suggestions;
   pendingScores = scores;
   pendingInputEl = inputEl;
@@ -490,7 +583,6 @@ export function renderFeedback(
     document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`).forEach(p => p.remove());
     feedbackVisible = false;
   }
-  // If the mouse is already inside the input bar, show pills immediately
   if (mouseInsideInputBar) {
     showPendingPills();
   }
@@ -500,8 +592,9 @@ export function hideFeedback(instant = false): void {
   if (!feedbackVisible && !instant) return;
   feedbackVisible = false;
 
-  // Only clear pending state when explicitly resetting (user started typing),
-  // not on a normal mouseleave hide — pending should survive hover cycles.
+  // Always remove the bridge immediately
+  document.getElementById(FEEDBACK_BRIDGE_ID)?.remove();
+
   if (instant) {
     pendingSuggestions = [];
     pendingScores = null;
@@ -523,7 +616,7 @@ export function hideFeedback(instant = false): void {
 }
 
 // ---------------------------------------------------------------------------
-// Pulsing border — shown while the Ollama AI score is pending
+// Pulsing border — shown while Ollama AI score is pending
 // ---------------------------------------------------------------------------
 
 function injectPulseStyles(): void {
@@ -532,30 +625,23 @@ function injectPulseStyles(): void {
   style.id = PULSE_STYLE_ID;
   style.textContent = `
     @keyframes askbetter-pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.7), 0 2px 10px rgba(0,0,0,0.4); border-color: #a78bfa; }
-      50%  { box-shadow: 0 0 0 4px rgba(167, 139, 250, 0), 0 2px 10px rgba(0,0,0,0.4); border-color: #c4b5fd; }
-      100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0), 0 2px 10px rgba(0,0,0,0.4); border-color: #a78bfa; }
+      0%   { filter: drop-shadow(0 0 0px rgba(167,139,250,0.0)); }
+      50%  { filter: drop-shadow(0 0 8px rgba(167,139,250,0.9)); }
+      100% { filter: drop-shadow(0 0 0px rgba(167,139,250,0.0)); }
     }
-    #${BADGE_ID}.${PULSE_CLASS} {
+    #askbetter-badge-svg.${PULSE_CLASS} {
       animation: askbetter-pulse 1.2s ease-in-out infinite;
     }
   `;
   document.head.appendChild(style);
 }
 
-/**
- * Toggle the pulsing border on the badge.
- * Call with true when Ollama scoring starts, false when it resolves.
- */
 export function setBadgeLoading(loading: boolean): void {
   injectPulseStyles();
-  const badge = document.getElementById(BADGE_ID);
-  if (!badge) return;
-  if (loading) {
-    badge.classList.add(PULSE_CLASS);
-  } else {
-    badge.classList.remove(PULSE_CLASS);
-  }
+  const svg = document.getElementById('askbetter-badge-svg');
+  if (!svg) return;
+  if (loading) svg.classList.add(PULSE_CLASS);
+  else svg.classList.remove(PULSE_CLASS);
 }
 
 // ---------------------------------------------------------------------------
@@ -565,47 +651,133 @@ export function setBadgeLoading(loading: boolean): void {
 export function renderOverlay(score: LiveScore, inputEl: HTMLElement, platform?: PlatformConfig): void {
   currentScore = score;
   const inputBar = findInputBar(inputEl, platform);
+  const color = getScoreColor(score.overall);
+  const circumference = 2 * Math.PI * RING_R;
+  const filled = circumference * (score.overall / 100);
+  const gap = circumference - filled;
+  const cx = BUBBLE_SIZE / 2;
+  const cy = BUBBLE_SIZE / 2;
+  const svgNS = 'http://www.w3.org/2000/svg';
+
   let badge = document.getElementById(BADGE_ID) as HTMLElement | null;
 
   if (!badge) {
+    // Outer wrapper — same size/position as before, no background (SVG handles it)
     badge = document.createElement('div');
     badge.id = BADGE_ID;
     badge.style.cssText = `
       position: fixed;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: rgba(15, 10, 30, 0.92);
-      border: 2px solid rgba(139, 92, 246, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+      width: ${BUBBLE_SIZE}px;
+      height: ${BUBBLE_SIZE}px;
       z-index: ${BADGE_Z};
       cursor: default;
       pointer-events: auto;
       opacity: 0;
-      transition: opacity 0.2s ease, border-color 0.2s ease;
+      transition: opacity 0.2s ease;
     `;
-    badge.addEventListener('mouseenter', () => showBubbles(badge!));
+
+    // SVG — identical structure to makeBubble
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('id', 'askbetter-badge-svg');
+    svg.setAttribute('width', String(BUBBLE_SIZE));
+    svg.setAttribute('height', String(BUBBLE_SIZE));
+    svg.setAttribute('viewBox', `0 0 ${BUBBLE_SIZE} ${BUBBLE_SIZE}`);
+    svg.style.cssText = `position:absolute;top:0;left:0;transition:filter 0.2s ease;`;
+
+    // Glass bg
+    const glassBg = document.createElementNS(svgNS, 'circle');
+    glassBg.setAttribute('id', 'askbetter-badge-glassbg');
+    glassBg.setAttribute('cx', String(cx)); glassBg.setAttribute('cy', String(cy));
+    glassBg.setAttribute('r', String(INNER_R + 3));
+    svg.appendChild(glassBg);
+
+    // Purple ring accent
+    const purpleRing = document.createElementNS(svgNS, 'circle');
+    purpleRing.setAttribute('cx', String(cx)); purpleRing.setAttribute('cy', String(cy));
+    purpleRing.setAttribute('r', String(INNER_R + 3));
+    purpleRing.setAttribute('fill', 'none');
+    purpleRing.setAttribute('stroke', 'rgba(167,139,250,0.18)');
+    purpleRing.setAttribute('stroke-width', '1.5');
+    svg.appendChild(purpleRing);
+
+    // Glass highlight
+    const highlight = document.createElementNS(svgNS, 'circle');
+    highlight.setAttribute('cx', String(cx)); highlight.setAttribute('cy', String(cy));
+    highlight.setAttribute('r', String(INNER_R + 3));
+    highlight.setAttribute('fill', 'url(#askbetter-glass-grad)');
+    svg.appendChild(highlight);
+
+    // Arc track
+    const track = document.createElementNS(svgNS, 'circle');
+    track.setAttribute('cx', String(cx)); track.setAttribute('cy', String(cy));
+    track.setAttribute('r', String(RING_R));
+    track.setAttribute('fill', 'none');
+    track.setAttribute('stroke', 'rgba(167,139,250,0.20)');
+    track.setAttribute('stroke-width', String(RING_STROKE));
+    svg.appendChild(track);
+
+    // Progress arc
+    const arc = document.createElementNS(svgNS, 'circle');
+    arc.setAttribute('id', 'askbetter-badge-arc');
+    arc.setAttribute('cx', String(cx)); arc.setAttribute('cy', String(cy));
+    arc.setAttribute('r', String(RING_R));
+    arc.setAttribute('fill', 'none');
+    arc.setAttribute('stroke-width', String(RING_STROKE));
+    arc.setAttribute('stroke-linecap', 'round');
+    arc.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+    arc.style.transition = 'stroke-dasharray 0.4s ease, stroke 0.2s ease';
+    svg.appendChild(arc);
+
+    // Score text
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('id', 'askbetter-badge-text');
+    text.setAttribute('x', String(cx)); text.setAttribute('y', String(cy));
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'central');
+    text.setAttribute('font-size', '11');
+    text.setAttribute('font-weight', '800');
+    text.setAttribute('font-family', "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
+    svg.appendChild(text);
+
+    badge.appendChild(svg);
+
+    badge.addEventListener('mouseenter', () => {
+      const s = document.getElementById('askbetter-badge-svg');
+      if (s) s.style.filter = `drop-shadow(0 3px 16px ${getScoreColor(currentScore?.overall ?? 0)}88)`;
+      showBubbles(badge!);
+    });
+    badge.addEventListener('mouseleave', (e: MouseEvent) => {
+      const s = document.getElementById('askbetter-badge-svg');
+      if (s) s.style.filter = `drop-shadow(0 2px 10px ${getScoreColor(currentScore?.overall ?? 0)}55)`;
+      const rel = e.relatedTarget as HTMLElement | null;
+      if (rel?.closest(`.${BUBBLE_CLASS}`) || rel?.id === BRIDGE_ID) return;
+      hideBubbles();
+    });
     document.body.appendChild(badge);
 
-    // Fade in
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        badge!.style.opacity = '1';
-      });
-    });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      badge!.style.opacity = '1';
+    }));
   }
 
-  const color = getScoreColor(score.overall);
-  badge.style.color = color;
-  badge.style.borderColor = `${color}99`;
-  badge.textContent = String(score.overall);
+  // Update SVG elements with new score/color
+  const glassBg = badge.querySelector('#askbetter-badge-glassbg');
+  if (glassBg) {
+    glassBg.setAttribute('fill', `${color}18`);
+    glassBg.setAttribute('stroke', `${color}38`);
+  }
+  const arc = badge.querySelector('#askbetter-badge-arc');
+  if (arc) {
+    arc.setAttribute('stroke', color);
+    arc.setAttribute('stroke-dasharray', `${filled} ${gap}`);
+  }
+  const text = badge.querySelector('#askbetter-badge-text');
+  if (text) {
+    text.setAttribute('fill', color);
+    text.textContent = String(score.overall);
+  }
+  const svg = badge.querySelector('#askbetter-badge-svg') as HTMLElement | null;
+  if (svg) svg.style.filter = `drop-shadow(0 2px 10px ${color}55)`;
 
   requestAnimationFrame(() => positionBadge(badge!, inputBar));
 }
@@ -619,13 +791,10 @@ export function hideOverlay(): void {
   }
 }
 
-// When the tab is hidden, bubble DOM nodes may be cleaned up by the browser
-// or simply become stale. Reset all state so hovering the badge on return
-// always shows fresh bubbles.
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    // Tab is being hidden — tear down bubbles and reset state cleanly
-    stopMouseTracking();
+    document.getElementById(BRIDGE_ID)?.remove();
+    document.getElementById(BADGE_LABEL_ID)?.remove();
     document.querySelectorAll<HTMLElement>(`.${BUBBLE_CLASS}`).forEach(b => b.remove());
     bubblesVisible = false;
   }
