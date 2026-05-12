@@ -84,7 +84,9 @@ function findInputBar(inputEl: HTMLElement, _platform?: PlatformConfig): HTMLEle
 function positionBadge(badge: HTMLElement, inputBar: HTMLElement): void {
   const rect = inputBar.getBoundingClientRect();
   const size = 48;
-  badge.style.top = `${rect.top + rect.height / 2 - size / 2}px`;
+  // Anchor to the bottom of the input bar so the badge stays put as the
+  // textarea grows vertically (multi-line prompts).
+  badge.style.top = `${rect.bottom - size}px`;
   badge.style.left = `${rect.left - size - 10}px`;
 }
 
