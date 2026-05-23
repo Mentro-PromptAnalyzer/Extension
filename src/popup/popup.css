@@ -49,18 +49,10 @@ body {
   color: #f5f3ff;
 }
 .platform-pill {
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: rgba(167, 139, 250, 0.7);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%);
-  border: 1px solid rgba(167, 139, 250, 0.25);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
-  padding: 3px 10px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── Tabs ── */
@@ -488,4 +480,215 @@ body {
 .oauth-btn:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* ── Lifetime stats — inline rows ── */
+.stats-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 2px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.08);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s;
+  border-radius: 6px;
+}
+.stat-row:last-child {
+  border-bottom: none;
+}
+.stat-row:hover {
+  background: rgba(167, 139, 250, 0.07);
+}
+.stat-row:hover .stat-row-caret {
+  color: rgba(167, 139, 250, 0.8);
+  transform: translateX(2px);
+}
+
+.stat-row-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1;
+}
+
+.stat-row-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(167, 139, 250, 0.5);
+  min-width: 90px;
+}
+
+.stat-row-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: rgba(245, 243, 255, 0.9);
+  letter-spacing: -0.01em;
+}
+
+.stat-row-caret {
+  color: rgba(167, 139, 250, 0.3);
+  flex-shrink: 0;
+  transition: color 0.15s, transform 0.15s;
+}
+
+/* ── Detail panel ── */
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(167, 139, 250, 0.6);
+  padding: 0 0 6px 0;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.1);
+  width: 100%;
+  text-align: left;
+  transition: color 0.15s;
+}
+.detail-back:hover {
+  color: rgba(167, 139, 250, 0.95);
+}
+.detail-back svg {
+  flex-shrink: 0;
+}
+
+.detail-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 2px;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.07);
+}
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row-label {
+  font-size: 11px;
+  color: rgba(167, 139, 250, 0.6);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+
+.detail-row-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(245, 243, 255, 0.85);
+  white-space: nowrap;
+}
+
+.detail-row-sub {
+  font-weight: 400;
+  color: rgba(167, 139, 250, 0.5);
+}
+
+.detail-empty {
+  font-size: 11px;
+  color: rgba(167, 139, 250, 0.35);
+  text-align: center;
+  padding: 12px 0;
+}
+
+.stats-loading {
+  font-size: 10px;
+  color: rgba(167, 139, 250, 0.4);
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* ── Word count distribution ── */
+.wc-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.wc-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wc-row-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.wc-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(245, 243, 255, 0.85);
+  min-width: 46px;
+}
+
+.wc-sublabel {
+  font-size: 9px;
+  color: rgba(167, 139, 250, 0.4);
+  flex: 1;
+}
+
+.wc-count {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.wc-pct {
+  font-weight: 400;
+  color: rgba(167, 139, 250, 0.45);
+}
+
+.wc-bar-track {
+  height: 4px;
+  background: rgba(167, 139, 250, 0.1);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.wc-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease-out;
+  opacity: 0.85;
+}
+
+.wc-footer {
+  font-size: 9px;
+  color: rgba(167, 139, 250, 0.35);
+  text-align: center;
+  padding-top: 2px;
+  border-top: 1px solid rgba(167, 139, 250, 0.08);
 }

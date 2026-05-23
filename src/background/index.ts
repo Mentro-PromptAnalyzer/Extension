@@ -77,7 +77,7 @@ Example suggestions: ["What are you trying to test? Describe the specific thing 
 Example 2 — short delegation prompt:
 Prompt: "fix my code"
 Expected scores: ownership=10, depth=15, critical=10, clarity=5, overall=10, intent="delegation"
-Example suggestions: ["Share the code you want fixed and describe what it should do.", "What error or behaviour are you seeing that needs fixing?", "What have you already tried to fix it?"]
+Example suggestions: ["Share the code you want fixed and describe what it should do.", "What error or behavior are you seeing that needs fixing?", "What have you already tried to fix it?"]
 
 Example 3 — medium quality prompt with context:
 Prompt: "how do i build a good breadth first search algorithm? I will be using python to code this on vscode."

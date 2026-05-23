@@ -346,7 +346,7 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
 }
 
 // ---------------------------------------------------------------------------
-// Initialisation — polls for the input element, re-attaches on SPA navigation
+// Initialization — polls for the input element, re-attaches on SPA navigation
 // ---------------------------------------------------------------------------
 
 function init(): void {

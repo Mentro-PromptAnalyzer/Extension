@@ -1,10 +1,23 @@
-import React, { useState, useRef } from 'react';
-import { AuthSession, saveSession, signInWithPassword, signInWithOAuth, signOut } from '../auth';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  AuthSession,
+  saveSession,
+  signInWithPassword,
+  signInWithOAuth,
+  signOut,
+  fetchLifetimeStats,
+  LifetimeStats,
+  WordCountBuckets,
+} from '../auth';
 
 interface Props {
   session: AuthSession | null;
   onSessionChange: (s: AuthSession | null) => void;
 }
+
+// ---------------------------------------------------------------------------
+// Auth icons
+// ---------------------------------------------------------------------------
 
 function GoogleIcon() {
   return (
@@ -37,15 +50,298 @@ function GitHubIcon() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function platformLabel(p: string): string {
+  if (p === 'chatgpt' || p === 'chatgpt.com' || p === 'chat.openai.com') return 'ChatGPT';
+  if (p === 'gemini' || p === 'gemini.google.com') return 'Gemini';
+  if (p === 'perplexity' || p === 'perplexity.ai') return 'Perplexity';
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
+function scoreColor(score: number): string {
+  if (score >= 70) return '#4ade80';
+  if (score >= 40) return '#fbbf24';
+  return '#f87171';
+}
+
+// ---------------------------------------------------------------------------
+// Detail panels
+// ---------------------------------------------------------------------------
+
+type DetailKey = 'prompts' | 'score' | 'sessions' | 'platform';
+
+function PromptsDetail({ stats }: { stats: LifetimeStats }) {
+  const { wordCountBuckets: b } = stats;
+
+  if (b.total === 0) {
+    return <div className="detail-empty">No prompt data yet.</div>;
+  }
+
+  const bands: { label: string; sublabel: string; count: number; color: string }[] = [
+    { label: 'Short', sublabel: '1–15 words', count: b.short, color: '#f87171' },
+    { label: 'Medium', sublabel: '16–50 words', count: b.medium, color: '#fbbf24' },
+    { label: 'Long', sublabel: '51+ words', count: b.long, color: '#4ade80' },
+  ];
+
+  return (
+    <div className="wc-distribution">
+      {bands.map((band) => {
+        const pct = b.total > 0 ? Math.round((band.count / b.total) * 100) : 0;
+        return (
+          <div key={band.label} className="wc-row">
+            <div className="wc-row-header">
+              <span className="wc-label">{band.label}</span>
+              <span className="wc-sublabel">{band.sublabel}</span>
+              <span className="wc-count" style={{ color: band.color }}>
+                {band.count} <span className="wc-pct">({pct}%)</span>
+              </span>
+            </div>
+            <div className="wc-bar-track">
+              <div className="wc-bar-fill" style={{ width: `${pct}%`, background: band.color }} />
+            </div>
+          </div>
+        );
+      })}
+      <div className="wc-footer">
+        {b.total} prompt{b.total !== 1 ? 's' : ''} across all sessions
+      </div>
+    </div>
+  );
+}
+
+function ScoreDetail({ stats }: { stats: LifetimeStats }) {
+  const scored = stats.sessions.filter((s) => s.overall_score > 0);
+  const bands = [
+    { label: 'Excellent (71–100)', min: 71, max: 100 },
+    { label: 'Good (41–70)', min: 41, max: 70 },
+    { label: 'Needs work (0–40)', min: 0, max: 40 },
+  ];
+  return (
+    <div className="detail-list">
+      {scored.length === 0 && <div className="detail-empty">No scored sessions yet.</div>}
+      {bands.map((b) => {
+        const count = scored.filter(
+          (s) => s.overall_score >= b.min && s.overall_score <= b.max
+        ).length;
+        const pct = scored.length > 0 ? Math.round((count / scored.length) * 100) : 0;
+        return (
+          <div key={b.label} className="detail-row">
+            <span className="detail-row-label">{b.label}</span>
+            <span className="detail-row-value">
+              {count} <span className="detail-row-sub">({pct}%)</span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SessionsDetail({ stats }: { stats: LifetimeStats }) {
+  const byPlatform = Object.entries(stats.platformCounts).sort((a, b) => b[1] - a[1]);
+  const unknown = stats.sessions.filter((s) => !s.platform || s.platform === 'unknown').length;
+  return (
+    <div className="detail-list">
+      {byPlatform.length === 0 && <div className="detail-empty">No platform data yet.</div>}
+      {byPlatform.map(([p, count]) => (
+        <div key={p} className="detail-row">
+          <span className="detail-row-label">{platformLabel(p)}</span>
+          <span className="detail-row-value">
+            {count} session{count !== 1 ? 's' : ''}
+          </span>
+        </div>
+      ))}
+      {unknown > 0 && (
+        <div className="detail-row">
+          <span className="detail-row-label">Unknown</span>
+          <span className="detail-row-value">
+            {unknown} session{unknown !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlatformDetail({ stats }: { stats: LifetimeStats }) {
+  const platforms = Object.entries(stats.platformCounts).sort((a, b) => b[1] - a[1]);
+  return (
+    <div className="detail-list">
+      {platforms.length === 0 && <div className="detail-empty">No platform data yet.</div>}
+      {platforms.map(([p, count]) => {
+        const avg = stats.platformAvgScores[p];
+        return (
+          <div key={p} className="detail-row">
+            <span className="detail-row-label">{platformLabel(p)}</span>
+            <span className="detail-row-value">
+              {count} session{count !== 1 ? 's' : ''}
+              {avg != null && (
+                <span className="detail-row-sub" style={{ color: scoreColor(avg) }}>
+                  {' '}
+                  · {avg} avg
+                </span>
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stat row (list item style, no box)
+// ---------------------------------------------------------------------------
+
+interface StatRowProps {
+  label: string;
+  value: string;
+  onClick: () => void;
+}
+
+function StatRow({ label, value, onClick }: StatRowProps) {
+  return (
+    <button className="stat-row" onClick={onClick}>
+      <span className="stat-row-left">
+        <span className="stat-row-label">{label}</span>
+        <span className="stat-row-value">{value}</span>
+      </span>
+      <svg
+        className="stat-row-caret"
+        width="12"
+        height="12"
+        viewBox="0 0 12 12"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M4.5 2.5L8 6l-3.5 3.5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Signed-in view
+// ---------------------------------------------------------------------------
+
+function SignedInView({
+  session,
+  stats,
+  statsLoading,
+  onSignOut,
+}: {
+  session: AuthSession;
+  stats: LifetimeStats | null;
+  statsLoading: boolean;
+  onSignOut: () => void;
+}) {
+  const [detail, setDetail] = useState<DetailKey | null>(null);
+
+  const detailTitles: Record<DetailKey, string> = {
+    prompts: 'Prompts scored',
+    score: 'Avg score',
+    sessions: 'Sessions',
+    platform: 'Top platform',
+  };
+
+  return (
+    <div className="account-signed-in">
+      <div className="account-user-card">
+        <div className="account-avatar">{session.email[0] ?? '?'}</div>
+        <span className="account-email">{session.email}</span>
+      </div>
+
+      {statsLoading && <div className="stats-loading">Loading stats…</div>}
+
+      {!statsLoading && stats && !detail && (
+        <div className="stats-list">
+          <StatRow
+            label="Prompts scored"
+            value={stats.totalPrompts > 0 ? stats.totalPrompts.toString() : '—'}
+            onClick={() => setDetail('prompts')}
+          />
+          <StatRow
+            label="Avg score"
+            value={stats.avgScore !== null ? stats.avgScore.toString() : '—'}
+            onClick={() => setDetail('score')}
+          />
+          <StatRow
+            label="Sessions"
+            value={stats.totalSessions > 0 ? stats.totalSessions.toString() : '—'}
+            onClick={() => setDetail('sessions')}
+          />
+          <StatRow
+            label="Top platform"
+            value={stats.topPlatform ? platformLabel(stats.topPlatform) : '—'}
+            onClick={() => setDetail('platform')}
+          />
+        </div>
+      )}
+
+      {!statsLoading && stats && detail && (
+        <div className="detail-panel">
+          <button className="detail-back" onClick={() => setDetail(null)}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M7.5 2.5L4 6l3.5 3.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {detailTitles[detail]}
+          </button>
+          {detail === 'prompts' && <PromptsDetail stats={stats} />}
+          {detail === 'score' && <ScoreDetail stats={stats} />}
+          {detail === 'sessions' && <SessionsDetail stats={stats} />}
+          {detail === 'platform' && <PlatformDetail stats={stats} />}
+        </div>
+      )}
+
+      <button className="signout-btn" onClick={onSignOut}>
+        Sign out
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function AccountTab({ session, onSessionChange }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loadingPassword, setLoadingPassword] = useState(false);
   const [loadingOAuth, setLoadingOAuth] = useState<'google' | 'github' | null>(null);
+  const [stats, setStats] = useState<LifetimeStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
   const anyLoading = loadingPassword || loadingOAuth !== null;
+
+  useEffect(() => {
+    if (!session) {
+      setStats(null);
+      return;
+    }
+    setStatsLoading(true);
+    fetchLifetimeStats(session.access_token)
+      .then(setStats)
+      .catch(() => setStats(null))
+      .finally(() => setStatsLoading(false));
+  }, [session]);
 
   async function handlePasswordSignIn() {
     setError('');
@@ -57,11 +353,9 @@ export function AccountTab({ session, onSessionChange }: Props) {
       setError('Please enter your password.');
       return;
     }
-
     setLoadingPassword(true);
     const result = await signInWithPassword(email, password);
     setLoadingPassword(false);
-
     if ('error' in result) {
       setError(result.error);
       return;
@@ -76,7 +370,6 @@ export function AccountTab({ session, onSessionChange }: Props) {
     setLoadingOAuth(provider);
     const result = await signInWithOAuth(provider);
     setLoadingOAuth(null);
-
     if ('error' in result) {
       if (result.error) setError(result.error);
       return;
@@ -93,15 +386,12 @@ export function AccountTab({ session, onSessionChange }: Props) {
 
   if (session) {
     return (
-      <div className="account-signed-in">
-        <div className="account-user-card">
-          <div className="account-avatar">{session.email[0] ?? '?'}</div>
-          <span className="account-email">{session.email}</span>
-        </div>
-        <button className="signout-btn" onClick={handleSignOut}>
-          Sign out
-        </button>
-      </div>
+      <SignedInView
+        session={session}
+        stats={stats}
+        statsLoading={statsLoading}
+        onSignOut={handleSignOut}
+      />
     );
   }
 
