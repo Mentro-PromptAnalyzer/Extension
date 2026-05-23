@@ -4,13 +4,13 @@
 
 ```
 manifest.json        # Chrome MV3 manifest — permissions, entry points, host_permissions
-popup.html           # Extension popup UI (inline CSS, loads dist/popup.js)
-vite.config.ts       # Build config — defines the three entry points
-tsconfig.json        # TypeScript config — strict, ES2022, bundler resolution
+popup.html           # Minimal shell — just <div id="root">, loads dist/popup.js
+vite.config.ts       # Build config — defines the three entry points, includes React plugin
+tsconfig.json        # TypeScript config — strict, ES2022, bundler resolution, jsx: react-jsx
 package.json
 icons/               # Extension icons at 16, 48, 128px
 dist/                # Build output (gitignored) — loaded by Chrome
-src/                 # All source TypeScript
+src/                 # All source TypeScript/TSX
 ```
 
 ## src/ Modules
@@ -42,11 +42,18 @@ src/                 # All source TypeScript
 |---|---|
 | `index.ts` | Receives `SCORE_UPDATE` and `PROMPT_SUBMITTED` messages from content script; serves `GET_LATEST_SCORE` to popup; proxies `OLLAMA_SCORE` requests to `http://localhost:11434`. `buildPreAnalysis(heuristic)` is an extracted helper that builds the pre-analysis block injected into the Ollama prompt (detected intent, key topics, heuristic scores, weakest dimensions, detected signals, baseline scores). `SYSTEM_PROMPT` constant is defined after the message handlers for readability. |
 
-### `src/popup/` — Extension popup
+### `src/popup/` — Extension popup (React)
 
 | File | Responsibility |
 |---|---|
-| `index.ts` | Two-tab dashboard (Tips / Settings). Tips tab: static per-dimension improvement guide. Settings tab: pills toggle, badge toggle — persisted via `chrome.storage.sync` and broadcast to content scripts via `SETTINGS_UPDATE`. Reset to defaults button. Platform badge in header reads active tab URL. |
+| `main.tsx` | Entry point — mounts `<App />` into `#root` via `createRoot`, imports `popup.css` |
+| `popup.css` | All popup styles — extracted from old inline HTML, imported by `main.tsx` |
+| `auth.ts` | Supabase auth functions: `loadSession`, `saveSession`, `signInWithPassword`, `signOut`, `signInWithOAuth`. All calls are direct `fetch` to Supabase REST — no SDK. `AuthSession` type exported. |
+| `settings.ts` | Settings persistence: `loadSettings`, `saveSettings`, `Settings` interface, `DEFAULT_SETTINGS`. `saveSettings` broadcasts `SETTINGS_UPDATE` to all content scripts. |
+| `components/App.tsx` | Root component — manages `activeTab`, `session`, `settings` state; loads both from storage on mount via `useEffect`; renders header with platform badge, tab bar, and three tab panels. |
+| `components/TipsTab.tsx` | Static tips cards as a data-driven component array — no state. |
+| `components/SettingsTab.tsx` | Pills/badge toggles with React state; calls `saveSettings` on change; shows saved toast. |
+| `components/AccountTab.tsx` | Auth UI — signed-out: email/password form + Google/GitHub OAuth buttons; signed-in: user card + sign-out. Loading states per auth method. Icons are inline SVG components. |
 
 ## Key Architectural Rules
 
@@ -59,6 +66,8 @@ src/                 # All source TypeScript
 - The `LiveScore` interface (defined in `engine.ts`) is the single contract between analysis and UI layers
 - **Two-layer scoring**: heuristic (`engine.ts`) fires instantly at 300 ms debounce; Ollama (`ollama.ts`) fires async at 1500 ms debounce and merges over the heuristic result. Ollama failures are silent — heuristic score remains. Badge border pulses purple 600 ms after heuristic fires to signal AI scoring is pending; pulse cancels immediately if user resumes typing. **Feedback pills are stored as pending state** when Ollama (or heuristic fallback) responds — they render only when the user hovers the input bar (`mouseenter`) and hide on `mouseleave`. If the mouse is already inside the input bar when feedback arrives, pills show immediately. Pending state is cleared when the user starts typing a new prompt **or when the input is emptied** (text < 5 chars — `hideFeedback(true)` is called, clearing all pending state so hovering an empty bar shows nothing). `attachInputBarHover` is called once per input attach in `index.ts`. When merging Ollama scores, if Ollama returns empty suggestions the heuristic suggestions are used as fallback so pills always have content.
 - **Settings persistence**: user settings (`pillsEnabled`, `badgeEnabled`) are stored in `chrome.storage.sync`. Popup broadcasts `SETTINGS_UPDATE` to all tabs on change; content script applies changes immediately via module-level `contentSettings` object. Toggling badge off calls `hideOverlay()` instantly; toggling on re-triggers `onInputChange`. Toggling pills off calls `hideFeedback(true)` instantly. `renderOverlay` and `renderFeedback` calls in the scoring flow are gated by `contentSettings.badgeEnabled` / `contentSettings.pillsEnabled`.
+- **Auth**: Supabase Auth email/password + OAuth (Google, GitHub) flows live in `src/popup/auth.ts`, consumed by `AccountTab.tsx`. Email/password calls `/auth/v1/token?grant_type=password`. OAuth uses `chrome.identity.launchWebAuthFlow` — redirect URL is `chrome.identity.getRedirectURL('auth')` (format: `https://<ext-id>.chromiumapp.org/auth`), which must be added to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs. Tokens are parsed from the redirect URL fragment. All auth calls are direct `fetch` to Supabase — no SDK. Session stored in `chrome.storage.local`. `"identity"` permission required in `manifest.json`.
+- **Supabase backend**: hosted project `anmsstuexchqyghqoipt`. Public tables: `users` (mirrors `auth.users`), `analysis_history`, `chat_histories` — all with RLS enabled and `user_id` FK to `auth.users.id`. Fly.dev backend (`https://askbetter-kirohacks.fly.dev`) is a separate server; auth bypasses it and goes directly to Supabase Auth.
 - **Ollama fetch lives in the background worker** (`background/index.ts`), not in the content script. Content scripts on https:// pages cannot make http:// requests (Chrome mixed-content block). `ollama.ts` is a thin message-passing wrapper only.
 - **Ollama CORS config required**: Ollama rejects requests from `chrome-extension://` origins by default (403). Must set `OLLAMA_ORIGINS="chrome-extension://*"` before starting Ollama. Persistent setup: add `export OLLAMA_ORIGINS="chrome-extension://*"` to `~/.zshrc`, or run `launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"` once for the macOS app. Model: `llama3.2`, timeout: 30 s (first inference is slow — warm up with `ollama run llama3.2` before use).
 - **Ollama system prompt** uses anchored scale descriptions (0/40/70/100 examples per dimension) and five calibration examples — vague prompt ("test test test", scores ~4), short delegation ("fix my code", scores ~10), medium-quality curiosity prompt (BFS in Python, scores ~44), high-quality structured delegation prompt (FlickIt MVP, scores ~76), and high-quality structured delegation with requirements list and no question marks (academic essay, scores ~69) — covering the full quality range and explicitly teaching the model not to penalize imperative phrasing when requirements are clearly listed. Suggestions rules: must reference only topics present in the prompt (never invent topics), be a concrete question the user could literally add, target a different weak dimension each, with good/bad examples. Hard constraint: `CRITICAL: suggestions must only reference topics that appear in the prompt`. `num_predict=500`.

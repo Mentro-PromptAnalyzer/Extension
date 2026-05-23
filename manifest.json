@@ -3,7 +3,7 @@
   "name": "AskBetter — Live Prompt Analyzer",
   "version": "0.1.0",
   "description": "Analyze your AI prompts in real-time as you type. Get scores, suggestions, and feedback before you hit send.",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "identity"],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
