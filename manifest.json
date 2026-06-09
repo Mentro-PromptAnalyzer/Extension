@@ -10,7 +10,7 @@
     "https://gemini.google.com/*",
     "https://www.perplexity.ai/*",
     "https://perplexity.ai/*",
-    "http://localhost:11434/*"
+    "https://askbetter-kirohacks.fly.dev/*"
   ],
   "background": {
     "service_worker": "dist/background.js",

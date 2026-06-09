@@ -15,18 +15,18 @@ html {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(167, 139, 250, 0.25);
+  background: rgba(167, 139, 250, 0.3);
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(167, 139, 250, 0.45);
+  background: rgba(167, 139, 250, 0.55);
 }
 
 body {
   width: 320px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #0f0a1e;
-  color: #f5f3ff;
+  background: #111113;
+  color: #f0eef5;
   overflow-x: hidden;
 }
 
@@ -36,20 +36,20 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(167, 139, 250, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .header h1 {
   font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: rgba(167, 139, 250, 0.9);
+  color: rgba(167, 139, 250, 0.95);
 }
 .header h1 span {
-  color: #f5f3ff;
+  color: #f0eef5;
 }
 .platform-pill {
-  color: rgba(167, 139, 250, 0.7);
+  color: rgba(240, 238, 245, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,7 +58,7 @@ body {
 /* ── Tabs ── */
 .tabs {
   display: flex;
-  border-bottom: 1px solid rgba(167, 139, 250, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 .tab-btn {
   flex: 1;
@@ -67,7 +67,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(167, 139, 250, 0.4);
+  color: rgba(240, 238, 245, 0.35);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -76,11 +76,11 @@ body {
   font-family: inherit;
 }
 .tab-btn:hover {
-  color: rgba(167, 139, 250, 0.75);
+  color: rgba(240, 238, 245, 0.65);
 }
 .tab-btn.active {
-  color: rgba(167, 139, 250, 0.95);
-  border-bottom-color: rgba(167, 139, 250, 0.6);
+  color: rgba(240, 238, 245, 0.9);
+  border-bottom-color: rgba(167, 139, 250, 0.7);
 }
 
 /* ── Tab panels ── */
@@ -99,9 +99,9 @@ body {
   gap: 8px;
 }
 .tip-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%);
-  border: 1px solid rgba(167, 139, 250, 0.18);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   padding: 10px 12px;
   backdrop-filter: blur(12px);
@@ -109,8 +109,8 @@ body {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .tip-card:hover {
-  border-color: rgba(167, 139, 250, 0.35);
-  box-shadow: 0 0 18px 2px rgba(167, 139, 250, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 18px 2px rgba(167, 139, 250, 0.07);
 }
 .tip-card-header {
   display: flex;
@@ -140,11 +140,11 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #f5f3ff;
+  color: #f0eef5;
 }
 .tip-card-body {
   font-size: 11px;
-  color: rgba(167, 139, 250, 0.75);
+  color: rgba(240, 238, 245, 0.5);
   line-height: 1.5;
   margin-bottom: 6px;
 }
@@ -158,7 +158,7 @@ body {
   align-items: flex-start;
   gap: 6px;
   font-size: 10px;
-  color: rgba(167, 139, 250, 0.5);
+  color: rgba(240, 238, 245, 0.35);
   font-style: italic;
   line-height: 1.4;
 }
@@ -166,7 +166,7 @@ body {
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background: rgba(167, 139, 250, 0.4);
+  background: rgba(240, 238, 245, 0.25);
   flex-shrink: 0;
   margin-top: 5px;
 }
@@ -183,16 +183,16 @@ body {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-  border: 1px solid rgba(167, 139, 250, 0.12);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   transition: border-color 0.15s;
 }
 .setting-card:hover {
-  border-color: rgba(167, 139, 250, 0.25);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 .setting-info {
   flex: 1;
@@ -202,12 +202,12 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: rgba(167, 139, 250, 0.9);
+  color: rgba(240, 238, 245, 0.85);
   margin-bottom: 2px;
 }
 .setting-desc {
   font-size: 10px;
-  color: rgba(167, 139, 250, 0.4);
+  color: rgba(240, 238, 245, 0.35);
   line-height: 1.4;
 }
 .toggle {
@@ -225,9 +225,9 @@ body {
 .toggle-track {
   position: absolute;
   inset: 0;
-  background: rgba(167, 139, 250, 0.12);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 99px;
-  border: 1px solid rgba(167, 139, 250, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
@@ -238,14 +238,14 @@ body {
   left: 2px;
   width: 12px;
   height: 12px;
-  background: rgba(167, 139, 250, 0.4);
+  background: rgba(240, 238, 245, 0.35);
   border-radius: 50%;
   transition: transform 0.2s, background 0.2s;
 }
 .toggle input:checked + .toggle-track {
-  background: rgba(167, 139, 250, 0.25);
-  border-color: rgba(167, 139, 250, 0.5);
-  box-shadow: 0 0 10px 1px rgba(167, 139, 250, 0.2);
+  background: rgba(167, 139, 250, 0.22);
+  border-color: rgba(167, 139, 250, 0.55);
+  box-shadow: 0 0 10px 1px rgba(167, 139, 250, 0.18);
 }
 .toggle input:checked + .toggle-track::after {
   transform: translateX(16px);
@@ -257,11 +257,11 @@ body {
 .reset-btn {
   width: 100%;
   padding: 8px 12px;
-  background: linear-gradient(135deg, rgba(248, 113, 113, 0.08) 0%, rgba(248, 113, 113, 0.03) 100%);
-  border: 1px solid rgba(248, 113, 113, 0.2);
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.07) 0%, rgba(248, 113, 113, 0.02) 100%);
+  border: 1px solid rgba(248, 113, 113, 0.18);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  color: rgba(248, 113, 113, 0.7);
+  color: rgba(248, 113, 113, 0.65);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -273,9 +273,9 @@ body {
   font-family: inherit;
 }
 .reset-btn:hover {
-  border-color: rgba(248, 113, 113, 0.4);
-  color: rgba(248, 113, 113, 0.95);
-  box-shadow: 0 0 14px 1px rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.38);
+  color: rgba(248, 113, 113, 0.9);
+  box-shadow: 0 0 14px 1px rgba(248, 113, 113, 0.1);
 }
 .saved-toast {
   font-size: 9px;
@@ -314,16 +314,16 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(167, 139, 250, 0.55);
+  color: rgba(240, 238, 245, 0.4);
 }
 .auth-input {
   width: 100%;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
-  color: #f5f3ff;
+  color: #f0eef5;
   font-size: 11px;
   font-family: inherit;
   outline: none;
@@ -331,7 +331,7 @@ body {
   box-sizing: border-box;
 }
 .auth-input::placeholder {
-  color: rgba(167, 139, 250, 0.3);
+  color: rgba(240, 238, 245, 0.22);
 }
 .auth-input:focus {
   border-color: rgba(167, 139, 250, 0.5);
@@ -340,9 +340,9 @@ body {
 .auth-btn {
   width: 100%;
   padding: 9px 12px;
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.2) 0%, rgba(167, 139, 250, 0.08) 100%);
+  background: rgba(167, 139, 250, 0.15);
   border: 1px solid rgba(167, 139, 250, 0.35);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(167, 139, 250, 0.45);
   border-radius: 12px;
   color: rgba(167, 139, 250, 0.95);
   font-size: 10px;
@@ -360,7 +360,7 @@ body {
   box-shadow: 0 0 16px 2px rgba(167, 139, 250, 0.15);
 }
 .auth-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
 }
 .auth-error {
@@ -380,9 +380,9 @@ body {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
-  border: 1px solid rgba(167, 139, 250, 0.18);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -391,7 +391,7 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.3), rgba(167, 139, 250, 0.1));
+  background: rgba(167, 139, 250, 0.15);
   border: 1px solid rgba(167, 139, 250, 0.35);
   display: flex;
   align-items: center;
@@ -404,7 +404,7 @@ body {
 }
 .account-email {
   font-size: 11px;
-  color: rgba(245, 243, 255, 0.85);
+  color: rgba(240, 238, 245, 0.75);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -413,11 +413,11 @@ body {
 .signout-btn {
   width: 100%;
   padding: 8px 12px;
-  background: linear-gradient(135deg, rgba(248, 113, 113, 0.08) 0%, rgba(248, 113, 113, 0.03) 100%);
-  border: 1px solid rgba(248, 113, 113, 0.2);
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.07) 0%, rgba(248, 113, 113, 0.02) 100%);
+  border: 1px solid rgba(248, 113, 113, 0.18);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  color: rgba(248, 113, 113, 0.7);
+  color: rgba(248, 113, 113, 0.65);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -429,9 +429,9 @@ body {
   font-family: inherit;
 }
 .signout-btn:hover {
-  border-color: rgba(248, 113, 113, 0.4);
-  color: rgba(248, 113, 113, 0.95);
-  box-shadow: 0 0 14px 1px rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.38);
+  color: rgba(248, 113, 113, 0.9);
+  box-shadow: 0 0 14px 1px rgba(248, 113, 113, 0.1);
 }
 .auth-divider {
   display: flex;
@@ -442,14 +442,14 @@ body {
 .auth-divider-line {
   flex: 1;
   height: 1px;
-  background: rgba(167, 139, 250, 0.15);
+  background: rgba(255, 255, 255, 0.08);
 }
 .auth-divider-text {
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(167, 139, 250, 0.35);
+  color: rgba(240, 238, 245, 0.25);
 }
 .oauth-btn {
   width: 100%;
@@ -458,11 +458,11 @@ body {
   justify-content: center;
   gap: 8px;
   padding: 8px 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%);
-  border: 1px solid rgba(167, 139, 250, 0.18);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 12px;
-  color: rgba(245, 243, 255, 0.75);
+  color: rgba(240, 238, 245, 0.65);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -473,12 +473,12 @@ body {
   font-family: inherit;
 }
 .oauth-btn:hover:not(:disabled) {
-  border-color: rgba(167, 139, 250, 0.35);
-  color: rgba(245, 243, 255, 0.95);
-  box-shadow: 0 0 14px 1px rgba(167, 139, 250, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(240, 238, 245, 0.9);
+  box-shadow: 0 0 14px 1px rgba(167, 139, 250, 0.08);
 }
 .oauth-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -496,7 +496,7 @@ body {
   padding: 9px 2px;
   background: none;
   border: none;
-  border-bottom: 1px solid rgba(167, 139, 250, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
@@ -507,7 +507,7 @@ body {
   border-bottom: none;
 }
 .stat-row:hover {
-  background: rgba(167, 139, 250, 0.07);
+  background: rgba(255, 255, 255, 0.04);
 }
 .stat-row:hover .stat-row-caret {
   color: rgba(167, 139, 250, 0.8);
@@ -526,19 +526,19 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: rgba(167, 139, 250, 0.5);
+  color: rgba(240, 238, 245, 0.38);
   min-width: 90px;
 }
 
 .stat-row-value {
   font-size: 15px;
   font-weight: 800;
-  color: rgba(245, 243, 255, 0.9);
+  color: rgba(240, 238, 245, 0.9);
   letter-spacing: -0.01em;
 }
 
 .stat-row-caret {
-  color: rgba(167, 139, 250, 0.3);
+  color: rgba(240, 238, 245, 0.2);
   flex-shrink: 0;
   transition: color 0.15s, transform 0.15s;
 }
@@ -562,9 +562,9 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: rgba(167, 139, 250, 0.6);
+  color: rgba(167, 139, 250, 0.65);
   padding: 0 0 6px 0;
-  border-bottom: 1px solid rgba(167, 139, 250, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   width: 100%;
   text-align: left;
   transition: color 0.15s;
@@ -586,7 +586,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 7px 2px;
-  border-bottom: 1px solid rgba(167, 139, 250, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 .detail-row:last-child {
   border-bottom: none;
@@ -594,7 +594,7 @@ body {
 
 .detail-row-label {
   font-size: 11px;
-  color: rgba(167, 139, 250, 0.6);
+  color: rgba(240, 238, 245, 0.45);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -605,25 +605,25 @@ body {
 .detail-row-value {
   font-size: 11px;
   font-weight: 700;
-  color: rgba(245, 243, 255, 0.85);
+  color: rgba(240, 238, 245, 0.85);
   white-space: nowrap;
 }
 
 .detail-row-sub {
   font-weight: 400;
-  color: rgba(167, 139, 250, 0.5);
+  color: rgba(240, 238, 245, 0.35);
 }
 
 .detail-empty {
   font-size: 11px;
-  color: rgba(167, 139, 250, 0.35);
+  color: rgba(240, 238, 245, 0.28);
   text-align: center;
   padding: 12px 0;
 }
 
 .stats-loading {
   font-size: 10px;
-  color: rgba(167, 139, 250, 0.4);
+  color: rgba(240, 238, 245, 0.3);
   text-align: center;
   padding: 8px 0;
 }
@@ -651,13 +651,13 @@ body {
 .wc-label {
   font-size: 11px;
   font-weight: 700;
-  color: rgba(245, 243, 255, 0.85);
+  color: rgba(240, 238, 245, 0.85);
   min-width: 46px;
 }
 
 .wc-sublabel {
   font-size: 9px;
-  color: rgba(167, 139, 250, 0.4);
+  color: rgba(240, 238, 245, 0.3);
   flex: 1;
 }
 
@@ -668,12 +668,12 @@ body {
 
 .wc-pct {
   font-weight: 400;
-  color: rgba(167, 139, 250, 0.45);
+  color: rgba(240, 238, 245, 0.35);
 }
 
 .wc-bar-track {
   height: 4px;
-  background: rgba(167, 139, 250, 0.1);
+  background: rgba(255, 255, 255, 0.07);
   border-radius: 99px;
   overflow: hidden;
 }
@@ -687,8 +687,8 @@ body {
 
 .wc-footer {
   font-size: 9px;
-  color: rgba(167, 139, 250, 0.35);
+  color: rgba(240, 238, 245, 0.25);
   text-align: center;
   padding-top: 2px;
-  border-top: 1px solid rgba(167, 139, 250, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }

@@ -43,12 +43,11 @@ interface SettingsUpdate {
 type Message = ScoreMessage | PromptMessage | OllamaRequest | SettingsUpdate;
 
 // ---------------------------------------------------------------------------
-// Ollama config
+// Groq (via Fly.dev backend) config
 // ---------------------------------------------------------------------------
 
-const OLLAMA_URL = 'http://localhost:11434/api/generate';
-const MODEL = 'llama3.2';
-const TIMEOUT_MS = 30_000; // llama3.2 can be slow on first inference
+const SCORE_URL = 'https://askbetter-kirohacks.fly.dev/api/chat/stream';
+const TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
 // Ollama system prompt
@@ -145,7 +144,7 @@ Use the key topics and weak dimensions above to write suggestions that are speci
 }
 
 // ---------------------------------------------------------------------------
-// Ollama fetch
+// Groq fetch (via Fly.dev /api/chat/stream — SSE)
 // ---------------------------------------------------------------------------
 
 function clamp(n: number): number {
@@ -160,33 +159,78 @@ async function fetchOllamaScore(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    console.log('[AskBetter:bg] Fetching from Ollama...');
+    console.log('[AskBetter:bg] Fetching from Fly.dev backend (Groq)...');
     const t0 = Date.now();
 
     const preAnalysis = heuristic ? buildPreAnalysis(heuristic) : '';
+    const userContent = `${preAnalysis}\n\nPrompt to evaluate:\n${text}`;
 
-    const res = await fetch(OLLAMA_URL, {
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userContent },
+    ];
+
+    const res = await fetch(SCORE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({
-        model: MODEL,
-        prompt: `${SYSTEM_PROMPT}${preAnalysis}\n\nPrompt to evaluate:\n${text}`,
-        stream: false,
-        options: { temperature: 0.1, num_predict: 500 },
-      }),
+      body: JSON.stringify({ messages }),
     });
 
-    console.log(`[AskBetter:bg] Ollama HTTP status: ${res.status} (${Date.now() - t0}ms)`);
+    console.log(`[AskBetter:bg] Fly.dev HTTP status: ${res.status} (${Date.now() - t0}ms)`);
     if (!res.ok) return null;
 
-    const data = (await res.json()) as { response?: string };
-    console.log('[AskBetter:bg] Raw Ollama response:', data.response?.slice(0, 300));
+    // Stream SSE tokens and accumulate the full response text
+    const reader = res.body?.getReader();
+    if (!reader) return null;
 
-    const raw = data.response?.trim() ?? '';
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulated = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      // SSE events are separated by double newlines
+      const chunks = buffer.split(/\r?\n\r?\n/);
+      buffer = chunks.pop() ?? '';
+
+      for (const chunk of chunks) {
+        const lines = chunk.split(/\r?\n/);
+        let event = 'message';
+        let payload: unknown = null;
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) event = line.slice(6).trim();
+          if (line.startsWith('data:')) {
+            try {
+              payload = JSON.parse(line.slice(5).trim());
+            } catch {
+              // ignore malformed JSON
+            }
+          }
+        }
+
+        if (event === 'token') {
+          const token = (payload as { text?: string })?.text;
+          if (token) accumulated += token;
+        } else if (event === 'end') {
+          break;
+        } else if (event === 'error') {
+          const msg = (payload as { message?: string })?.message;
+          console.log('[AskBetter:bg] SSE error event:', msg);
+          return null;
+        }
+      }
+    }
+
+    console.log('[AskBetter:bg] Raw accumulated response:', accumulated.slice(0, 300));
+
+    const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.log('[AskBetter:bg] No JSON found in response. Raw:', raw.slice(0, 500));
+      console.log('[AskBetter:bg] No JSON found in response. Raw:', accumulated.slice(0, 500));
       return null;
     }
 
@@ -229,11 +273,11 @@ async function fetchOllamaScore(
       : [];
 
     const result = { ownership, depth, critical, clarity, overall, intent, suggestions };
-    console.log('[AskBetter:bg] Ollama score parsed successfully:', result);
+    console.log('[AskBetter:bg] Score parsed successfully:', result);
     return result;
   } catch (err) {
     console.log(
-      '[AskBetter:bg] Ollama fetch error:',
+      '[AskBetter:bg] Fetch error:',
       err instanceof Error ? `${err.name}: ${err.message}` : err
     );
     return null;
