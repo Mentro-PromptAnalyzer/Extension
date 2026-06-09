@@ -30,6 +30,11 @@ interface OllamaRequest {
   heuristic?: HeuristicContext;
 }
 
+interface OAuthRequest {
+  type: 'OAUTH_SIGN_IN';
+  provider: 'google' | 'github';
+}
+
 interface SettingsUpdate {
   type: 'SETTINGS_UPDATE';
   settings: {
@@ -42,7 +47,13 @@ interface GetLatestScore {
   type: 'GET_LATEST_SCORE';
 }
 
-type Message = ScoreMessage | PromptMessage | OllamaRequest | SettingsUpdate | GetLatestScore;
+type Message =
+  | ScoreMessage
+  | PromptMessage
+  | OllamaRequest
+  | OAuthRequest
+  | SettingsUpdate
+  | GetLatestScore;
 
 // ---------------------------------------------------------------------------
 // Groq (via Fly.dev backend) config
@@ -306,6 +317,74 @@ async function fetchOllamaScore(
 }
 
 // ---------------------------------------------------------------------------
+// OAuth — runs in the background worker so the context survives popup close
+// ---------------------------------------------------------------------------
+
+const SUPABASE_URL = 'https://anmsstuexchqyghqoipt.supabase.co';
+const SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFubXNzdHVleGNocXlnaHFvaXB0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NTYwODIsImV4cCI6MjA5MzMzMjA4Mn0.wwFHPAU2PJEi4brxDVLC-TjGMgbXMkrizCeoyIlpyj0';
+
+async function handleOAuthSignIn(
+  provider: 'google' | 'github'
+): Promise<
+  { session: { access_token: string; refresh_token: string; email: string } } | { error: string }
+> {
+  try {
+    const redirectUrl = chrome.identity.getRedirectURL('auth');
+    const authUrl =
+      `${SUPABASE_URL}/auth/v1/authorize` +
+      `?provider=${provider}` +
+      `&redirect_to=${encodeURIComponent(redirectUrl)}`;
+
+    const callbackUrl = await new Promise<string>((resolve, reject) => {
+      chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, (url) => {
+        const err = chrome.runtime.lastError;
+        if (err || !url) reject(new Error(err?.message ?? 'OAuth cancelled.'));
+        else resolve(url);
+      });
+    });
+
+    const parsed = new URL(callbackUrl);
+    const params = new URLSearchParams(parsed.hash.slice(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token') ?? '';
+
+    if (!accessToken) {
+      const errorDesc =
+        params.get('error_description') ??
+        params.get('error') ??
+        new URLSearchParams(parsed.search).get('error_description') ??
+        new URLSearchParams(parsed.search).get('error');
+      return { error: errorDesc ?? 'OAuth sign-in failed — no token returned.' };
+    }
+
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` },
+    });
+    const userData = (await userRes.json()) as { email?: string; error?: string };
+    if (!userRes.ok) return { error: userData.error ?? 'Failed to fetch user after OAuth.' };
+
+    const session = {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      email: userData.email ?? '',
+    };
+
+    // Save session here in the background — survives popup close
+    await new Promise<void>((resolve) => {
+      chrome.storage.local.set({ askbetter_session: session }, resolve);
+    });
+
+    console.log('[AskBetter:bg] OAuth session saved for', userData.email);
+    return { session };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'OAuth sign-in failed.';
+    if (msg.toLowerCase().includes('cancel')) return { error: '' };
+    return { error: msg };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
@@ -348,6 +427,13 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
       sendResponse({ score });
     });
     return true; // keep message channel open for async response
+  }
+
+  if (message.type === 'OAUTH_SIGN_IN') {
+    handleOAuthSignIn(message.provider).then((result) => {
+      sendResponse(result);
+    });
+    return true;
   }
 
   if (message.type === 'SETTINGS_UPDATE') {

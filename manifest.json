@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AskBetter — Live Prompt Analyzer",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu0tB7LW/3/45hppSRjA5cw3giKRgeIKPGP8hAdozcTY0UkCOgZhWdBK6/geeyy9Vc25ivM+Q/rsXEwrDYFG6XXqOSWxL4QkND9Z3xo+s2KYTOyDfrsmBukDYTdKXtt2wXi5jbJUhRMucHAv1Chwb843Km5aTnIay6GabGXVwVdG3DsavcDi3lj+dDq6wjcosnrPZStdMZBNdCgJh14qK3MuEpa7mtnTzWM1BI8Yz0fyVk73A8J5KCecCH8HTy9nGB/Ibo0j+GmnDOrQx0Q7auzTwo2D7WMLGJVvGlLN2/MxHyFzeDHH5BZs03/4sztEXBZcqxjxbD+5MeZvPmclrowIDAQAB",
   "version": "0.1.0",
   "description": "Analyze your AI prompts in real-time as you type. Get scores, suggestions, and feedback before you hit send.",
   "permissions": ["storage", "activeTab", "identity"],

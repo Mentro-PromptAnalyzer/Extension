@@ -74,18 +74,13 @@ function usePlatform(): Platform {
 }
 
 function PlatformBadge({ platform }: { platform: Platform }) {
-  const inactive = platform === 'inactive';
+  if (platform === 'inactive') return null;
   return (
-    <span
-      className="platform-pill"
-      style={inactive ? { color: '#6b5fa0', borderColor: 'rgba(107, 95, 160, 0.3)' } : undefined}
-      title={inactive ? 'Inactive' : undefined}
-    >
+    <span className="platform-pill">
       {platform === 'chatgpt' && <ChatGPTLogo />}
       {platform === 'gemini' && <GeminiLogo />}
       {platform === 'perplexity' && <PerplexityLogo />}
       {platform === 'claude' && <ClaudeLogo />}
-      {platform === 'inactive' && '—'}
     </span>
   );
 }

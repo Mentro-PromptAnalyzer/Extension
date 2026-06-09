@@ -374,7 +374,7 @@ export function AccountTab({ session, onSessionChange }: Props) {
       if (result.error) setError(result.error);
       return;
     }
-    saveSession(result.session);
+    // Background worker already persisted the session — just update UI state
     onSessionChange(result.session);
   }
 
@@ -397,6 +397,28 @@ export function AccountTab({ session, onSessionChange }: Props) {
 
   return (
     <div className="auth-form">
+      <div className="auth-upsell">
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+          style={{ flexShrink: 0, marginTop: 1 }}
+        >
+          <path
+            d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+            stroke="rgba(167,139,250,0.7)"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span>
+          AI scoring &amp; personalised feedback require an account. Heuristic scoring is always
+          free.
+        </span>
+      </div>
       <div className="auth-field">
         <label className="auth-label" htmlFor="auth-email">
           Email

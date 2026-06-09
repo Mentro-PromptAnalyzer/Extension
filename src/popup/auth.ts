@@ -205,58 +205,14 @@ export async function fetchLifetimeStats(accessToken: string): Promise<LifetimeS
 export async function signInWithOAuth(
   provider: 'google' | 'github'
 ): Promise<{ session: AuthSession } | { error: string }> {
-  try {
-    const redirectUrl = chrome.identity.getRedirectURL('auth');
-    const authUrl =
-      `${SUPABASE_URL}/auth/v1/authorize` +
-      `?provider=${provider}` +
-      `&redirect_to=${encodeURIComponent(redirectUrl)}`;
-
-    const responseUrl = await new Promise<string>((resolve, reject) => {
-      chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, (callbackUrl) => {
-        const err = chrome.runtime.lastError;
-        if (err || !callbackUrl) {
-          reject(new Error(err?.message ?? 'OAuth cancelled.'));
-        } else {
-          resolve(callbackUrl);
-        }
-      });
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'OAUTH_SIGN_IN', provider }, (response) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        resolve({ error: err.message ?? 'OAuth failed.' });
+        return;
+      }
+      resolve(response as { session: AuthSession } | { error: string });
     });
-
-    const parsedUrl = new URL(responseUrl);
-    const params = new URLSearchParams(parsedUrl.hash.slice(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token') ?? '';
-
-    if (!accessToken) {
-      const errorDesc =
-        params.get('error_description') ??
-        params.get('error') ??
-        new URLSearchParams(parsedUrl.search).get('error_description') ??
-        new URLSearchParams(parsedUrl.search).get('error');
-      return { error: errorDesc ?? 'OAuth sign-in failed — no token returned.' };
-    }
-
-    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` },
-    });
-    const userData = (await userRes.json()) as { email?: string; error?: string };
-    if (!userRes.ok) {
-      return { error: userData.error ?? 'Failed to fetch user after OAuth.' };
-    }
-
-    return {
-      session: {
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        email: userData.email ?? '',
-      },
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'OAuth sign-in failed.';
-    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('user')) {
-      return { error: '' };
-    }
-    return { error: msg };
-  }
+  });
 }
