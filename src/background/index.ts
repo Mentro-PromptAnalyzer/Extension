@@ -181,12 +181,12 @@ async function fetchOllamaScore(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    console.log('[AskBetter:bg] Fetching AI score from Fly.dev backend (Groq)...');
+    console.log('[AskBetter:bg] Fetching AI score...');
     const t0 = Date.now();
 
     const accessToken = await getAccessToken();
     if (!accessToken) {
-      console.log('[AskBetter:bg] No session — skipping AI score (user not signed in).');
+      // No session — skip AI scoring
       return null;
     }
 
@@ -208,7 +208,7 @@ async function fetchOllamaScore(
       body: JSON.stringify({ messages }),
     });
 
-    console.log(`[AskBetter:bg] Fly.dev HTTP status: ${res.status} (${Date.now() - t0}ms)`);
+    console.log(`[AskBetter:bg] HTTP ${res.status} (${Date.now() - t0}ms)`);
     if (!res.ok) return null;
 
     // Stream SSE tokens and accumulate the full response text
@@ -250,22 +250,14 @@ async function fetchOllamaScore(
         } else if (event === 'end') {
           break;
         } else if (event === 'error') {
-          const msg = (payload as { message?: string })?.message;
-          console.log('[AskBetter:bg] SSE error event:', msg);
           return null;
         }
       }
     }
 
-    console.log('[AskBetter:bg] Raw accumulated response:', accumulated.slice(0, 300));
-
     const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.log('[AskBetter:bg] No JSON found in response. Raw:', accumulated.slice(0, 500));
-      return null;
-    }
+    if (!jsonMatch) return null;
 
-    console.log('[AskBetter:bg] Extracted JSON:', jsonMatch[0]);
     const parsed = JSON.parse(jsonMatch[0]) as {
       ownership?: number;
       depth?: number;
@@ -282,7 +274,6 @@ async function fetchOllamaScore(
       typeof parsed.critical !== 'number' ||
       typeof parsed.clarity !== 'number'
     ) {
-      console.log('[AskBetter:bg] Parsed JSON missing required fields:', parsed);
       return null;
     }
 
@@ -304,13 +295,10 @@ async function fetchOllamaScore(
       : [];
 
     const result = { ownership, depth, critical, clarity, overall, intent, suggestions };
-    console.log('[AskBetter:bg] Score parsed successfully:', result);
+    console.log(`[AskBetter:bg] Score: ${overall}`);
     return result;
   } catch (err) {
-    console.log(
-      '[AskBetter:bg] Fetch error:',
-      err instanceof Error ? `${err.name}: ${err.message}` : err
-    );
+    console.log('[AskBetter:bg] Fetch error:', err instanceof Error ? err.message : err);
     return null;
   } finally {
     clearTimeout(timer);
@@ -349,11 +337,7 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
 
   if (message.type === 'PROMPT_SUBMITTED') {
     latestScore = message.score;
-    console.log('[AskBetter] Prompt submitted:', {
-      length: message.text.length,
-      score: message.score.overall,
-      intent: message.score.intent,
-    });
+    console.log(`[AskBetter] Prompt submitted, score: ${message.score.overall}`);
     sendResponse({ ok: true });
     return true;
   }

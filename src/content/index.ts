@@ -186,13 +186,7 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
 
   debounceTimer = setTimeout(() => {
     const text = getInputText(el);
-    console.log(
-      '[AskBetter] input change, text length:',
-      text.length,
-      'trimmed:',
-      text.trim().length,
-      JSON.stringify(text.slice(0, 50))
-    );
+    // (no per-keystroke logging)
 
     if (text.trim().length < 5) {
       lastScoredText = '';
@@ -235,7 +229,7 @@ async function scheduleOllamaScore(
   platform: ReturnType<typeof detectPlatform>,
   gen: number
 ): Promise<void> {
-  console.log('[AskBetter] AI scoring started');
+  console.log('[AskBetter] AI scoring...');
 
   const heuristicContext = buildHeuristicContext(text, heuristicScore, displayScore);
   const aiScore = await scoreWithOllama(text, heuristicContext);
@@ -251,7 +245,7 @@ async function scheduleOllamaScore(
   setBadgeLoading(false);
 
   if (!aiScore) {
-    console.log('[AskBetter] AI score unavailable — falling back to heuristic suggestions');
+    console.log('[AskBetter] AI unavailable — using heuristic suggestions');
     if (contentSettings.pillsEnabled) {
       renderFeedback(heuristicScore.suggestions, heuristicScore, el, platform ?? undefined);
     }
@@ -277,7 +271,7 @@ async function scheduleOllamaScore(
         : heuristicScore.suggestions,
   };
 
-  console.log('[AskBetter] AI score received:', merged.overall);
+  console.log(`[AskBetter] AI score: ${merged.overall}`);
 
   // Store AI score so subsequent heuristic renders can blend toward it
   lastAiScore = merged as LiveScore;
@@ -303,7 +297,7 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
   }
   activeInput = input;
 
-  console.log(`[AskBetter] Attaching observer to input`, input.id, input.className);
+  console.log(`[AskBetter] Attaching to input on ${platform?.name}`);
 
   // Score immediately — text may already be present
   onInputChange(input, platform);
@@ -351,7 +345,7 @@ function init(): void {
   const platform = detectPlatform();
   if (!platform) return;
 
-  console.log(`[AskBetter] Detected platform: ${platform.name}`);
+  console.log(`[AskBetter] Platform: ${platform.name}`);
 
   const pollInterval = setInterval(() => {
     const input = findInputElement(platform);
@@ -365,7 +359,7 @@ function init(): void {
       setInterval(() => {
         const current = findInputElement(platform);
         if (current && current !== activeInput) {
-          console.log('[AskBetter] Input element replaced, re-attaching');
+          console.log('[AskBetter] Input replaced, re-attaching');
           attachToInput(current, platform);
         }
       }, 1000);

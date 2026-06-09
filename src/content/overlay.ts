@@ -152,20 +152,12 @@ function positionBadge(badge: HTMLElement, inputBar: HTMLElement, platform?: Pla
     const btn = findPlusButton(platform.plusButtonSelector);
     if (btn) {
       const btnRect = btn.getBoundingClientRect();
-      console.log(
-        '[AskBetter] positionBadge anchoring to + button:',
-        btn.getAttribute('aria-label'),
-        btnRect
-      );
       // Vertically center the badge with the + button; sit just to its left
       badge.style.top = `${btnRect.top + btnRect.height / 2 - size / 2 + nudgeY}px`;
       badge.style.left = `${btnRect.left - size - gap}px`;
       return;
     }
-    console.log(
-      '[AskBetter] positionBadge: + button not found yet for selectors:',
-      platform.plusButtonSelector
-    );
+    // + button not found yet — fallback to input bar
   }
 
   // Fallback: anchor to bottom of the input bar
@@ -695,18 +687,7 @@ function createPillElement(
 }
 
 function showPendingPills(): void {
-  console.log(
-    '[AskBetter:pills] mouseenter fired — pendingScores:',
-    pendingScores,
-    'suggestions:',
-    pendingSuggestions,
-    'inputEl:',
-    pendingInputEl
-  );
-  if (!pendingScores || pendingSuggestions.length === 0 || !pendingInputEl) {
-    console.log('[AskBetter:pills] showPendingPills bailed — missing data');
-    return;
-  }
+  if (!pendingScores || pendingSuggestions.length === 0 || !pendingInputEl) return;
 
   injectFeedbackStyles();
   document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`).forEach((p) => p.remove());
@@ -716,7 +697,6 @@ function showPendingPills(): void {
   const inputBar = inputBarHoverEl ?? findInputBar(pendingInputEl, pendingPlatform);
   const rect = inputBar.getBoundingClientRect();
   const pillNudgeY = pendingPlatform?.pillNudgeY ?? 0;
-  console.log('[AskBetter:pills] rendering pills at rect:', rect.left, rect.top, rect.width);
 
   const dimOrder: (keyof typeof pendingScores)[] = ['ownership', 'depth', 'critical', 'clarity'];
   const lowDims = dimOrder.filter((k) => pendingScores![k] < 60);
@@ -799,11 +779,6 @@ export function attachInputBarHover(inputEl: HTMLElement, platform?: PlatformCon
   }
 
   const inputBar = findInputBar(inputEl, platform);
-  console.log(
-    '[AskBetter:pills] attachInputBarHover — resolved inputBar:',
-    inputBar.tagName,
-    inputBar.className.slice(0, 80)
-  );
   inputBarHoverEl = inputBar;
 
   inputBarEnterListener = () => {
@@ -831,12 +806,6 @@ export function renderFeedback(
   inputEl: HTMLElement,
   platform?: PlatformConfig
 ): void {
-  console.log(
-    '[AskBetter:pills] renderFeedback called — suggestions:',
-    suggestions,
-    'scores:',
-    scores
-  );
   pendingSuggestions = suggestions;
   pendingScores = scores;
   pendingInputEl = inputEl;
