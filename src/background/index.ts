@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Background service worker
 // Handles communication between content scripts and the popup.
-// Proxies Ollama requests — content scripts on https:// pages cannot make
+// Proxies AI scoring requests — content scripts on https:// pages cannot make
 // http:// requests directly (mixed-content block), but the background worker
 // has no such restriction.
 // ---------------------------------------------------------------------------
@@ -33,14 +33,16 @@ interface OllamaRequest {
 interface SettingsUpdate {
   type: 'SETTINGS_UPDATE';
   settings: {
-    ollamaEnabled: boolean;
-    debounceMs: number;
     pillsEnabled: boolean;
     badgeEnabled: boolean;
   };
 }
 
-type Message = ScoreMessage | PromptMessage | OllamaRequest | SettingsUpdate;
+interface GetLatestScore {
+  type: 'GET_LATEST_SCORE';
+}
+
+type Message = ScoreMessage | PromptMessage | OllamaRequest | SettingsUpdate | GetLatestScore;
 
 // ---------------------------------------------------------------------------
 // Groq (via Fly.dev backend) config
@@ -50,7 +52,27 @@ const SCORE_URL = 'https://askbetter-kirohacks.fly.dev/api/chat/stream';
 const TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
-// Ollama system prompt
+// Session helpers — read Supabase JWT from storage so the background worker
+// can attach it to outbound requests for server-side auth verification.
+// ---------------------------------------------------------------------------
+
+interface StoredSession {
+  access_token: string;
+  refresh_token: string;
+  email: string;
+}
+
+async function getAccessToken(): Promise<string | null> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get('askbetter_session', (result) => {
+      const session = result['askbetter_session'] as StoredSession | undefined;
+      resolve(session?.access_token ?? null);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// AI system prompt
 // ---------------------------------------------------------------------------
 
 const SYSTEM_PROMPT = `You are an expert at evaluating the quality of prompts sent to AI assistants.
@@ -112,7 +134,7 @@ Respond with ONLY valid JSON, no markdown, no explanation:
 
 // ---------------------------------------------------------------------------
 // Pre-analysis block builder
-// Injects pre-computed heuristic signals into the Ollama prompt so the model
+// Injects pre-computed heuristic signals into the AI prompt so the model
 // can skip re-deriving intent/topics and focus on generating suggestions.
 // ---------------------------------------------------------------------------
 
@@ -159,8 +181,14 @@ async function fetchOllamaScore(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    console.log('[AskBetter:bg] Fetching from Fly.dev backend (Groq)...');
+    console.log('[AskBetter:bg] Fetching AI score from Fly.dev backend (Groq)...');
     const t0 = Date.now();
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      console.log('[AskBetter:bg] No session — skipping AI score (user not signed in).');
+      return null;
+    }
 
     const preAnalysis = heuristic ? buildPreAnalysis(heuristic) : '';
     const userContent = `${preAnalysis}\n\nPrompt to evaluate:\n${text}`;
@@ -172,7 +200,10 @@ async function fetchOllamaScore(
 
     const res = await fetch(SCORE_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
       signal: controller.signal,
       body: JSON.stringify({ messages }),
     });
@@ -294,8 +325,6 @@ let latestScore: LiveScore | null = null;
 
 // Active settings — updated when the popup broadcasts SETTINGS_UPDATE
 let activeSettings = {
-  ollamaEnabled: true,
-  debounceMs: 300,
   pillsEnabled: true,
   badgeEnabled: true,
 };
@@ -330,12 +359,7 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
   }
 
   if (message.type === 'OLLAMA_SCORE') {
-    // Respect the ollamaEnabled setting — if disabled, return null immediately
-    if (!activeSettings.ollamaEnabled) {
-      sendResponse({ score: null });
-      return true;
-    }
-    // Proxy the Ollama fetch and return the result asynchronously
+    // Proxy the AI fetch and return the result asynchronously
     fetchOllamaScore(message.text, message.heuristic).then((score) => {
       sendResponse({ score });
     });
@@ -348,14 +372,11 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
     return true;
   }
 
-  sendResponse({ ok: true });
-  return true;
-});
-
-// Handle popup requesting the latest score
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_LATEST_SCORE') {
     sendResponse({ score: latestScore });
+    return true;
   }
+
+  sendResponse({ ok: true });
   return true;
 });

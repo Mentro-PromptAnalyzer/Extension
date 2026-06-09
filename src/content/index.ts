@@ -16,6 +16,7 @@ import {
 import { scoreWithOllama } from '../analysis/ollama';
 import { extractTopicsTFIDF } from '../analysis/tfidf';
 import type { HeuristicContext } from '../analysis/ollama';
+import type { LiveScore } from '../analysis/engine';
 
 // ---------------------------------------------------------------------------
 // Debounce timers and constants
@@ -33,7 +34,7 @@ const OLLAMA_EXTRA_MS = 1200; // additional wait after heuristic fires (total = 
 // Module-level state
 // ---------------------------------------------------------------------------
 
-// Generation counter — incremented once per input change so stale Ollama
+// Generation counter — incremented once per input change so stale AI
 // responses don't overwrite a newer score.
 let currentOllamaGen = 0;
 
@@ -43,7 +44,7 @@ let lastScoredText = '';
 
 // Last AI score — used to blend heuristic scores smoothly when the user
 // resumes typing after an AI score has landed.
-let lastAiScore: ReturnType<typeof analyzePrompt> | null = null;
+let lastAiScore: LiveScore | null = null;
 let lastAiText = '';
 
 let activeInput: HTMLElement | null = null;
@@ -86,10 +87,7 @@ function blendScore(heuristic: number, ai: number, similarity: number): number {
   return Math.round(heuristic * (1 - aiWeight) + ai * aiWeight);
 }
 
-function blendWithAiScore(
-  heuristic: ReturnType<typeof analyzePrompt>,
-  currentText: string
-): ReturnType<typeof analyzePrompt> {
+function blendWithAiScore(heuristic: LiveScore, currentText: string): LiveScore {
   if (!lastAiScore) return heuristic;
 
   const similarity = textSimilarity(currentText, lastAiText);
@@ -110,7 +108,7 @@ function blendWithAiScore(
 }
 
 // ---------------------------------------------------------------------------
-// Soft floor — prevents Ollama from dragging a well-scored prompt down
+// Soft floor — prevents AI from dragging a well-scored prompt down
 // significantly. Caps any drop to 8 points below the currently displayed score.
 // If the AI scores higher, the full AI value is used.
 // ---------------------------------------------------------------------------
@@ -120,14 +118,14 @@ function softFloor(ai: number, displayed: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Heuristic context builder — packages pre-computed signals for Ollama so it
-// can skip re-deriving intent/topics and focus on generating suggestions.
+// Heuristic context builder — packages pre-computed signals for the AI scorer
+// so it can skip re-deriving intent/topics and focus on generating suggestions.
 // ---------------------------------------------------------------------------
 
 function buildHeuristicContext(
   text: string,
-  heuristicScore: ReturnType<typeof analyzePrompt>,
-  displayScore: ReturnType<typeof analyzePrompt>
+  heuristicScore: LiveScore,
+  displayScore: LiveScore
 ): HeuristicContext {
   const topics = extractTopicsTFIDF(text, STOP_WORDS, 3);
   return {
@@ -222,7 +220,7 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
       setBadgeLoading(true);
     }, PULSE_DELAY_MS);
 
-    // Layer 2: async Ollama re-score after typing fully settles
+    // Layer 2: async AI re-score after typing fully settles
     ollamaTimer = setTimeout(() => {
       scheduleOllamaScore(text, heuristicScore, displayScore, el, platform, gen);
     }, OLLAMA_EXTRA_MS);
@@ -231,13 +229,13 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
 
 async function scheduleOllamaScore(
   text: string,
-  heuristicScore: ReturnType<typeof analyzePrompt>,
-  displayScore: ReturnType<typeof analyzePrompt>,
+  heuristicScore: LiveScore,
+  displayScore: LiveScore,
   el: HTMLElement,
   platform: ReturnType<typeof detectPlatform>,
   gen: number
 ): Promise<void> {
-  console.log('[AskBetter] Ollama scoring started');
+  console.log('[AskBetter] AI scoring started');
 
   const heuristicContext = buildHeuristicContext(text, heuristicScore, displayScore);
   const aiScore = await scoreWithOllama(text, heuristicContext);
@@ -249,11 +247,11 @@ async function scheduleOllamaScore(
   // prompt that arrive after the user has already changed the input.
   if (text !== lastScoredText) return;
 
-  // Stop pulsing regardless of whether Ollama succeeded
+  // Stop pulsing regardless of whether AI scoring succeeded
   setBadgeLoading(false);
 
   if (!aiScore) {
-    console.log('[AskBetter] Ollama unavailable — falling back to heuristic suggestions');
+    console.log('[AskBetter] AI score unavailable — falling back to heuristic suggestions');
     if (contentSettings.pillsEnabled) {
       renderFeedback(heuristicScore.suggestions, heuristicScore, el, platform ?? undefined);
     }
@@ -262,7 +260,7 @@ async function scheduleOllamaScore(
 
   // Merge AI scores over the heuristic base.
   // Soft-floor prevents the badge from visibly dipping when the user has been
-  // steadily improving their prompt and Ollama disagrees slightly.
+  // steadily improving their prompt and the AI disagrees slightly.
   const ds = displayScore;
   const merged = {
     ...heuristicScore,
@@ -272,17 +270,17 @@ async function scheduleOllamaScore(
     critical: softFloor(aiScore.critical ?? heuristicScore.critical, ds.critical),
     clarity: softFloor(aiScore.clarity ?? heuristicScore.clarity, ds.clarity),
     overall: softFloor(aiScore.overall ?? heuristicScore.overall, ds.overall),
-    // Fall back to heuristic suggestions if Ollama returned none
+    // Fall back to heuristic suggestions if AI returned none
     suggestions:
       aiScore.suggestions && aiScore.suggestions.length > 0
         ? aiScore.suggestions
         : heuristicScore.suggestions,
   };
 
-  console.log('[AskBetter] Ollama score received:', merged.overall);
+  console.log('[AskBetter] AI score received:', merged.overall);
 
   // Store AI score so subsequent heuristic renders can blend toward it
-  lastAiScore = merged as ReturnType<typeof analyzePrompt>;
+  lastAiScore = merged as LiveScore;
   lastAiText = text;
 
   if (contentSettings.badgeEnabled) {
