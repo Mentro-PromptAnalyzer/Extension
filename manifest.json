@@ -10,6 +10,7 @@
     "https://gemini.google.com/*",
     "https://www.perplexity.ai/*",
     "https://perplexity.ai/*",
+    "https://claude.ai/*",
     "https://askbetter-kirohacks.fly.dev/*"
   ],
   "background": {
@@ -23,7 +24,8 @@
         "https://chat.openai.com/*",
         "https://gemini.google.com/*",
         "https://www.perplexity.ai/*",
-        "https://perplexity.ai/*"
+        "https://perplexity.ai/*",
+        "https://claude.ai/*"
       ],
       "js": ["dist/content.js"],
       "run_at": "document_idle"

@@ -1,6 +1,6 @@
 # AskBetter Chrome Extension
 
-AskBetter is a Chrome extension that analyzes AI prompts in real-time as the user types in ChatGPT, Gemini, or Perplexity. It scores the prompt across four dimensions — Ownership, Depth, Rigor, and Clarity — and surfaces actionable suggestions before the user hits send.
+AskBetter is a Chrome extension that analyzes AI prompts in real-time as the user types in ChatGPT, Gemini, Perplexity, or Claude. It scores the prompt across four dimensions — Ownership, Depth, Rigor, and Clarity — and surfaces actionable suggestions before the user hits send.
 
 ## Core Purpose
 
@@ -11,6 +11,7 @@ Help users write better prompts by giving them live feedback on prompt quality, 
 - ChatGPT (chatgpt.com, chat.openai.com)
 - Gemini (gemini.google.com)
 - Perplexity (perplexity.ai)
+- Claude (claude.ai)
 
 ## Scoring Dimensions
 
@@ -33,7 +34,7 @@ Prompts are classified into one of four intents: `delegation`, `curiosity`, `col
 
 ## UI
 
-A floating badge (score circle) appears next to the input bar. Hovering the badge stacks 4 metric circles vertically above it (Clarity closest, Ownership at top), each with a glass-style background tinted by score color, an SVG arc ring, score number, and label. An "OVERALL" label fades in below the badge alongside the metric circles. Circles animate in with a staggered slide-up entrance. While Ollama is scoring, the badge border pulses purple to signal a score update is pending. The badge is anchored to the bottom of the input bar so it stays fixed as the textarea grows vertically.
+A floating badge (score circle) appears next to the input bar. Hovering the badge stacks 4 metric circles vertically above it (Clarity closest, Ownership at top), each with a glass-style background tinted by score color, an SVG arc ring, score number, and label. An "OVERALL" label fades in below the badge alongside the metric circles. Circles animate in with a staggered slide-up entrance. While Ollama is scoring, the badge border pulses purple to signal a score update is pending. The badge is anchored just to the left of the input bar's "+" / attach button (via each platform's `plusButtonSelector`), vertically centered with it, so placement stays consistent across platforms; it polls up to ~3 s for the + button to appear and falls back to the bottom-left of the input bar if not found. Per-platform `badgeGap`, `badgeNudgeY`, and `pillNudgeY` offsets fine-tune badge and pill placement.
 
 **Feedback pills** — up to 3 suggestion pills appear above the input bar when the user hovers over it. Pills are stored as pending state after Ollama responds (or heuristic fallback) and rendered on `mouseenter` of the input bar; they hide on `mouseleave`. Pending state is cleared when the user starts typing a new prompt or when the input is emptied (text drops below 5 characters) — hovering an empty input bar shows nothing. Each pill is a bullet point with text from `LiveScore.suggestions`. Color is red (`#f87171`) for dimensions scoring below 60, green (`#4ade80`) when all dimensions are healthy. Pills have a matching color glow and glass-style background (backdrop-filter blur). Pills are collapsed to a single truncated line by default; hovering a pill expands it via a `max-height` transition, wrapping the full text and floating it over pills above via elevated z-index (no layout shift). The hover zone is the input bar + all pills together — moving between them does not dismiss. Pills dismiss only when the mouse leaves the entire group (input bar `mouseleave` checks `relatedTarget` and defers to the pill if the mouse is moving onto one; each pill's `mouseleave` dismisses unless moving back to the input bar or another pill). A transparent bridge div (`#askbetter-feedback-bridge`) spans from the top of the topmost pill down to the top edge of the input bar (stops short of the input bar so clicks and text selection there are not intercepted), filling gaps between pills and between the bottom pill and the input bar so gap-crossing doesn't trigger dismissal.
 

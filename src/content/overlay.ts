@@ -73,9 +73,46 @@ function getScoreColor(score: number): string {
 // DOM helpers
 // ---------------------------------------------------------------------------
 
-function findInputBar(inputEl: HTMLElement, _platform?: PlatformConfig): HTMLElement {
+function findInputBar(inputEl: HTMLElement, platform?: PlatformConfig): HTMLElement {
+  // 1. Platform-provided explicit selector — most reliable
+  if (platform?.inputBarSelector) {
+    try {
+      const explicit = document.querySelector<HTMLElement>(platform.inputBarSelector);
+      if (explicit) return explicit;
+    } catch {
+      // invalid selector — fall through
+    }
+  }
+  // 2. If the platform has a send button selector, walk up from the input until we
+  //    find the tightest ancestor that contains the send button. We stop climbing
+  //    when the element becomes wider than 95% of the viewport (i.e. we've left
+  //    the card). Height is NOT used as a stop condition — Claude and Perplexity
+  //    have tall input cards with multiple toolbar rows that exceed 400px.
+  if (platform?.sendButtonSelector) {
+    const sendBtn = document.querySelector<HTMLElement>(platform.sendButtonSelector);
+    if (sendBtn) {
+      let el: HTMLElement = inputEl;
+      while (el.parentElement && el.parentElement !== document.body) {
+        const parent = el.parentElement;
+        // Return the FIRST (tightest) ancestor that wraps both the input and the
+        // send button — this is the input card (text row + toolbar row). We check
+        // containment BEFORE any width guard: the card can legitimately be wide
+        // (Claude's card is near full-width), and breaking early on width would
+        // skip past it and fall through to a fallback that returns only the text
+        // row, excluding the toolbar row.
+        if (parent.contains(sendBtn)) {
+          return parent;
+        }
+        // Safety stop: only bail if we've reached a true full-bleed page wrapper.
+        if (parent.getBoundingClientRect().width >= window.innerWidth) break;
+        el = parent;
+      }
+    }
+  }
+  // 3. ChatGPT composer surface
   const composerSurface = document.querySelector<HTMLElement>('[data-composer-surface="true"]');
   if (composerSurface) return composerSurface;
+  // 4. Generic fallback: walk up until we hit an element with multiple children
   let el: HTMLElement = inputEl;
   while (el.parentElement && el.parentElement !== document.body) {
     if (el.parentElement.children.length > 1) return el;
@@ -84,13 +121,80 @@ function findInputBar(inputEl: HTMLElement, _platform?: PlatformConfig): HTMLEle
   return el;
 }
 
-function positionBadge(badge: HTMLElement, inputBar: HTMLElement): void {
-  const rect = inputBar.getBoundingClientRect();
+function findPlusButton(plusButtonSelector: string): HTMLElement | null {
+  // Use querySelectorAll with the full comma-separated selector string —
+  // do NOT split on commas manually since aria-label values can contain commas.
+  try {
+    const result = document.querySelector<HTMLElement>(plusButtonSelector);
+    return result;
+  } catch {
+    // Selector syntax error — try each part split on '], button[' boundaries
+    const parts = plusButtonSelector.split(/(?<=\])\s*,\s*(?=button\[)/);
+    for (const part of parts) {
+      try {
+        const el = document.querySelector<HTMLElement>(part.trim());
+        if (el) return el;
+      } catch {
+        // skip invalid part
+      }
+    }
+    return null;
+  }
+}
+
+function positionBadge(badge: HTMLElement, inputBar: HTMLElement, platform?: PlatformConfig): void {
   const size = 48;
-  // Anchor to the bottom of the input bar so the badge stays put as the
-  // textarea grows vertically (multi-line prompts).
-  badge.style.top = `${rect.bottom - size}px`;
-  badge.style.left = `${rect.left - size - 10}px`;
+  const gap = platform?.badgeGap ?? 10; // px between badge right edge and + button left edge
+  const nudgeY = platform?.badgeNudgeY ?? 0;
+
+  // Prefer anchoring to the + button so all platforms are visually consistent
+  if (platform?.plusButtonSelector) {
+    const btn = findPlusButton(platform.plusButtonSelector);
+    if (btn) {
+      const btnRect = btn.getBoundingClientRect();
+      console.log(
+        '[AskBetter] positionBadge anchoring to + button:',
+        btn.getAttribute('aria-label'),
+        btnRect
+      );
+      // Vertically center the badge with the + button; sit just to its left
+      badge.style.top = `${btnRect.top + btnRect.height / 2 - size / 2 + nudgeY}px`;
+      badge.style.left = `${btnRect.left - size - gap}px`;
+      return;
+    }
+    console.log(
+      '[AskBetter] positionBadge: + button not found yet for selectors:',
+      platform.plusButtonSelector
+    );
+  }
+
+  // Fallback: anchor to bottom of the input bar
+  const rect = inputBar.getBoundingClientRect();
+  badge.style.top = `${rect.bottom - size + nudgeY}px`;
+  badge.style.left = `${rect.left - size - 14}px`;
+}
+
+/**
+ * Re-position the badge once the + button appears in the DOM.
+ * Called when positionBadge falls back to the input-bar position.
+ * Polls up to ~3 s then gives up.
+ */
+function waitForPlusButtonAndReposition(
+  badge: HTMLElement,
+  inputBar: HTMLElement,
+  platform: PlatformConfig
+): void {
+  let attempts = 0;
+  const interval = setInterval(() => {
+    attempts++;
+    const btn = findPlusButton(platform.plusButtonSelector!);
+    if (btn) {
+      clearInterval(interval);
+      positionBadge(badge, inputBar, platform);
+      return;
+    }
+    if (attempts >= 30) clearInterval(interval); // give up after ~3 s
+  }, 100);
 }
 
 /**
@@ -523,7 +627,8 @@ function createPillElement(
   text: string,
   index: number,
   isGreen: boolean,
-  rect: DOMRect
+  rect: DOMRect,
+  nudgeY = 0
 ): HTMLElement {
   const color = isGreen ? '#4ade80' : '#f87171';
   const glowColor = isGreen ? 'rgba(74, 222, 128, 0.18)' : 'rgba(248, 113, 113, 0.18)';
@@ -534,7 +639,7 @@ function createPillElement(
   pill.style.cssText = `
     position: fixed;
     left: ${rect.left + 12}px;
-    top: ${rect.top - 44 - index * 40}px;
+    top: ${rect.top - 44 - index * 40 + nudgeY}px;
     max-width: ${Math.min(rect.width - 24, 520)}px;
     background: linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%);
     border: 1px solid ${borderColor};
@@ -610,6 +715,7 @@ function showPendingPills(): void {
 
   const inputBar = inputBarHoverEl ?? findInputBar(pendingInputEl, pendingPlatform);
   const rect = inputBar.getBoundingClientRect();
+  const pillNudgeY = pendingPlatform?.pillNudgeY ?? 0;
   console.log('[AskBetter:pills] rendering pills at rect:', rect.left, rect.top, rect.width);
 
   const dimOrder: (keyof typeof pendingScores)[] = ['ownership', 'depth', 'critical', 'clarity'];
@@ -617,13 +723,13 @@ function showPendingPills(): void {
 
   pendingSuggestions.slice(0, 3).forEach((text, i) => {
     const isGreen = lowDims.length === 0 || lowDims[i] === undefined;
-    const pill = createPillElement(text, i, isGreen, rect);
+    const pill = createPillElement(text, i, isGreen, rect, pillNudgeY);
     document.body.appendChild(pill);
   });
 
   // Transparent bridge covering the gaps between pills and the input bar
   const pillCount = pendingSuggestions.slice(0, 3).length;
-  const topPillTop = rect.top - 44 - (pillCount - 1) * 40;
+  const topPillTop = rect.top - 44 - (pillCount - 1) * 40 + pillNudgeY;
   const bridgeWidth = Math.min(rect.width - 24, 520) + 24;
 
   const bridge = document.createElement('div');
@@ -856,7 +962,14 @@ export function renderOverlay(
   const svg = badge.querySelector('#askbetter-badge-svg') as HTMLElement | null;
   if (svg) svg.style.filter = `drop-shadow(0 2px 10px ${color}55)`;
 
-  requestAnimationFrame(() => positionBadge(badge!, inputBar));
+  requestAnimationFrame(() => {
+    const btn = platform?.plusButtonSelector ? findPlusButton(platform.plusButtonSelector) : null;
+    positionBadge(badge!, inputBar, platform);
+    // If the + button wasn't in the DOM yet, poll until it appears
+    if (platform?.plusButtonSelector && !btn) {
+      waitForPlusButtonAndReposition(badge!, inputBar, platform);
+    }
+  });
 }
 
 export function hideOverlay(): void {

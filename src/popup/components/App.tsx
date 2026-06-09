@@ -6,7 +6,7 @@ import { AuthSession, loadSession } from '../auth';
 import { Settings, loadSettings, DEFAULT_SETTINGS } from '../settings';
 
 type Tab = 'tips' | 'settings' | 'account';
-type Platform = 'chatgpt' | 'gemini' | 'perplexity' | 'inactive';
+type Platform = 'chatgpt' | 'gemini' | 'perplexity' | 'claude' | 'inactive';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'account', label: 'Account' },
@@ -47,6 +47,17 @@ function PerplexityLogo() {
   );
 }
 
+function ClaudeLogo() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-label="Claude">
+      <path
+        d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-1.264-.072L1 12.28l.528-1.73 1.36.097 2.28.121 2.485.17 1.2.048-.048-.217-1.37-2.47-1.612-2.977-.978-1.924L5.736 2l1.03.595.978 1.924 1.588 2.95.787 1.418.199-.048L11.2 2.45 12.72 1l1.48.923-.498.747-1.37 2.687-1.455 2.784-.748 1.418.199.048 1.588-1.418 2.485-2.17 2.28-1.924 1.36.923-.978 1.924-.978.923-2.485 2.17-1.37 1.23.097.217 1.2-.048 2.485-.17 2.28-.121 1.36-.097.528 1.73-.528.38-1.264.072-2.339.097-2.698.073-.79.048h-.23l-.08.128.08.23 4.72 2.647L22 18.47l-.528 1.924-1.03-.595-4.72-2.647-.978-.595-.079.217.079.23v.812l.097 2.47.073 1.924.048 1.23-1.73.528-.38-1.03-.097-2.47-.073-2.47-.048-1.23-.217-.048-.217.048-.048 1.23-.073 2.47-.097 2.47-.38 1.03-1.73-.528.048-1.23.073-1.924.097-2.47v-.812l.079-.23-.079-.217-.978.595-4.72 2.647-1.03.595L2 18.47l1.709-.595z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function usePlatform(): Platform {
   const [platform, setPlatform] = useState<Platform>('inactive');
   useEffect(() => {
@@ -55,6 +66,7 @@ function usePlatform(): Platform {
       if (url.includes('chatgpt.com') || url.includes('chat.openai.com')) setPlatform('chatgpt');
       else if (url.includes('gemini.google.com')) setPlatform('gemini');
       else if (url.includes('perplexity.ai')) setPlatform('perplexity');
+      else if (url.includes('claude.ai')) setPlatform('claude');
       else setPlatform('inactive');
     });
   }, []);
@@ -72,6 +84,7 @@ function PlatformBadge({ platform }: { platform: Platform }) {
       {platform === 'chatgpt' && <ChatGPTLogo />}
       {platform === 'gemini' && <GeminiLogo />}
       {platform === 'perplexity' && <PerplexityLogo />}
+      {platform === 'claude' && <ClaudeLogo />}
       {platform === 'inactive' && '—'}
     </span>
   );
