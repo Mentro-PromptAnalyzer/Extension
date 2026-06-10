@@ -43,10 +43,10 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: rgba(167, 139, 250, 0.95);
+  color: #ffffff;
 }
 .header h1 span {
-  color: #f0eef5;
+  color: #ffffff;
 }
 .platform-pill {
   color: rgba(240, 238, 245, 0.45);

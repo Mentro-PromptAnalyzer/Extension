@@ -105,9 +105,7 @@ export function App() {
   return (
     <>
       <div className="header">
-        <h1>
-          Ask<span>Better</span>
-        </h1>
+        <h1>Mentro</h1>
         <PlatformBadge platform={platform} />
       </div>
 
