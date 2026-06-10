@@ -10,6 +10,6 @@
     "type": "askAgent",
     "prompt": "Review the three steering files in .kiro/steering/ (product.md, tech.md, structure.md) against the current state of the codebase. Focus on any files modified in the current git diff — check if new modules, dependencies, features, architectural patterns, or API changes are accurately reflected. Update only the steering files that are out of sync. Keep entries concise — these docs are for LLM context, not human prose. If nothing is out of date, do nothing."
   },
-  "workspaceFolderName": "AskBetter-Extension",
+  "workspaceFolderName": "Mentro-Extension",
   "shortName": "update-steering-docs"
 }
