@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import type { LiveScore } from '../analysis/engine';
-import type { HeuristicContext } from '../analysis/ollama';
+import type { HeuristicContext } from '../analysis/groq';
 
 // ---------------------------------------------------------------------------
 // JWT helper — decode exp claim without verifying signature
@@ -40,8 +40,8 @@ interface PromptMessage {
   score: LiveScore;
 }
 
-interface OllamaRequest {
-  type: 'OLLAMA_SCORE';
+interface GroqRequest {
+  type: 'GROQ_SCORE';
   text: string;
   heuristic?: HeuristicContext;
 }
@@ -66,7 +66,7 @@ interface GetLatestScore {
 type Message =
   | ScoreMessage
   | PromptMessage
-  | OllamaRequest
+  | GroqRequest
   | OAuthRequest
   | SettingsUpdate
   | GetLatestScore;
@@ -91,8 +91,8 @@ interface StoredSession {
 
 async function getAccessToken(): Promise<string | null> {
   return new Promise((resolve) => {
-    chrome.storage.local.get('askbetter_session', (result) => {
-      const session = result['askbetter_session'] as StoredSession | undefined;
+    chrome.storage.local.get('mentro_session', (result) => {
+      const session = result['mentro_session'] as StoredSession | undefined;
       resolve(session?.access_token ?? null);
     });
   });
@@ -200,7 +200,7 @@ function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-async function fetchOllamaScore(
+async function fetchGroqScore(
   text: string,
   heuristic?: HeuristicContext
 ): Promise<Partial<LiveScore> | null> {
@@ -382,7 +382,7 @@ async function handleOAuthSignIn(
 
     // Save session here in the background — survives popup close
     await new Promise<void>((resolve) => {
-      chrome.storage.local.set({ askbetter_session: session }, resolve);
+      chrome.storage.local.set({ mentro_session: session }, resolve);
     });
 
     return { session };
@@ -406,9 +406,9 @@ let activeSettings = {
 };
 
 // Load persisted settings on startup
-chrome.storage.sync.get('askbetter_settings', (result) => {
-  if (result['askbetter_settings']) {
-    activeSettings = { ...activeSettings, ...result['askbetter_settings'] };
+chrome.storage.sync.get('mentro_settings', (result) => {
+  if (result['mentro_settings']) {
+    activeSettings = { ...activeSettings, ...result['mentro_settings'] };
   }
 });
 
@@ -429,9 +429,9 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
     return true;
   }
 
-  if (message.type === 'OLLAMA_SCORE') {
+  if (message.type === 'GROQ_SCORE') {
     // Proxy the AI fetch and return the result asynchronously
-    fetchOllamaScore(message.text, message.heuristic).then((score) => {
+    fetchGroqScore(message.text, message.heuristic).then((score) => {
       sendResponse({ score });
     });
     return true; // keep message channel open for async response

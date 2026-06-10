@@ -44,17 +44,17 @@ function isTokenExpiringSoon(session: AuthSession): boolean {
 
 export async function loadSession(): Promise<AuthSession | null> {
   return new Promise((resolve) => {
-    chrome.storage.local.get('askbetter_session', (result) => {
-      resolve((result['askbetter_session'] as AuthSession | undefined) ?? null);
+    chrome.storage.local.get('mentro_session', (result) => {
+      resolve((result['mentro_session'] as AuthSession | undefined) ?? null);
     });
   });
 }
 
 export function saveSession(session: AuthSession | null): void {
   if (session) {
-    chrome.storage.local.set({ askbetter_session: session });
+    chrome.storage.local.set({ mentro_session: session });
   } else {
-    chrome.storage.local.remove('askbetter_session');
+    chrome.storage.local.remove('mentro_session');
   }
 }
 

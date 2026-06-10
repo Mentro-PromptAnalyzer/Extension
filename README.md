@@ -1,4 +1,4 @@
-# AskBetter Chrome Extension
+# Mentro Chrome Extension
 
 Live prompt analysis as you type in ChatGPT, Gemini, and Perplexity.
 
@@ -32,7 +32,7 @@ extension/
 3. Watches for input changes (debounced at 300ms)
 4. Runs the analysis engine on the current prompt text
 5. Renders a floating overlay with scores and suggestions
-6. Optionally syncs submitted prompts to the AskBetter backend
+6. Optionally syncs submitted prompts to the Mentro backend
 
 ## Development
 
@@ -50,7 +50,7 @@ Then load the extension in Chrome:
 
 ## TODO
 
-- [ ] Port full scoring logic from `askbetter/src/analysis/`
+- [ ] Port full scoring logic from `mentro/src/analysis/`
 - [ ] Track submitted prompts and sync to dashboard
 - [ ] Handle platform DOM changes (selectors may need updating)
 - [ ] Publish to Chrome Web Store

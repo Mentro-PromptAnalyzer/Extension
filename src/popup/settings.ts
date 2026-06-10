@@ -14,15 +14,15 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export async function loadSettings(): Promise<Settings> {
   return new Promise((resolve) => {
-    chrome.storage.sync.get('askbetter_settings', (result) => {
-      const saved = result['askbetter_settings'] as Partial<Settings> | undefined;
+    chrome.storage.sync.get('mentro_settings', (result) => {
+      const saved = result['mentro_settings'] as Partial<Settings> | undefined;
       resolve({ ...DEFAULT_SETTINGS, ...saved });
     });
   });
 }
 
 export function saveSettings(settings: Settings): void {
-  chrome.storage.sync.set({ askbetter_settings: settings });
+  chrome.storage.sync.set({ mentro_settings: settings });
   chrome.tabs.query({}, (tabs) => {
     for (const tab of tabs) {
       if (tab.id != null) {

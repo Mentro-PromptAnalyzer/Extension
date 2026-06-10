@@ -36,7 +36,7 @@ export interface HeuristicContext {
  * Request an AI score via the background service worker proxy.
  * Returns null if the backend is unreachable, times out, or returns invalid JSON.
  */
-export async function scoreWithOllama(
+export async function scoreWithGroq(
   text: string,
   heuristic?: HeuristicContext
 ): Promise<Partial<LiveScore> | null> {
@@ -46,9 +46,9 @@ export async function scoreWithOllama(
         resolve(null);
         return;
       }
-      chrome.runtime.sendMessage({ type: 'OLLAMA_SCORE', text, heuristic }, (response) => {
+      chrome.runtime.sendMessage({ type: 'GROQ_SCORE', text, heuristic }, (response) => {
         if (chrome.runtime.lastError) {
-          console.log('[AskBetter] AI score message error:', chrome.runtime.lastError.message);
+          console.log('[Mentro] AI score message error:', chrome.runtime.lastError.message);
           resolve(null);
           return;
         }

@@ -11,15 +11,15 @@ import type { PlatformConfig } from './selectors';
 // Constants
 // ---------------------------------------------------------------------------
 
-const BADGE_ID = 'askbetter-badge';
-const BADGE_LABEL_ID = 'askbetter-badge-label';
-const BUBBLE_CLASS = 'askbetter-bubble';
-const PULSE_STYLE_ID = 'askbetter-pulse-style';
-const PULSE_CLASS = 'askbetter-pulsing';
-const FEEDBACK_CLASS = 'askbetter-feedback-pill';
-const FEEDBACK_STYLE_ID = 'askbetter-feedback-style';
-const FEEDBACK_BRIDGE_ID = 'askbetter-feedback-bridge';
-const BRIDGE_ID = 'askbetter-bridge';
+const BADGE_ID = 'mentro-badge';
+const BADGE_LABEL_ID = 'mentro-badge-label';
+const BUBBLE_CLASS = 'mentro-bubble';
+const PULSE_STYLE_ID = 'mentro-pulse-style';
+const PULSE_CLASS = 'mentro-pulsing';
+const FEEDBACK_CLASS = 'mentro-feedback-pill';
+const FEEDBACK_STYLE_ID = 'mentro-feedback-style';
+const FEEDBACK_BRIDGE_ID = 'mentro-feedback-bridge';
+const BRIDGE_ID = 'mentro-bridge';
 const BADGE_Z = 999999;
 const BASE_Z = 999998;
 
@@ -41,7 +41,7 @@ let currentScore: LiveScore | null = null;
 let bubblesVisible = false;
 let feedbackVisible = false;
 
-// Pending feedback — stored when Ollama responds, rendered on input bar hover
+// Pending feedback — stored when Groq responds, rendered on input bar hover
 let pendingSuggestions: string[] = [];
 let pendingScores: Pick<LiveScore, 'ownership' | 'depth' | 'critical' | 'clarity'> | null = null;
 let pendingInputEl: HTMLElement | null = null;
@@ -207,9 +207,9 @@ function svgEl<K extends keyof SVGElementTagNameMap>(
  * Called before any bubble or badge is created so the gradient is available.
  */
 function injectGlassDefs(): void {
-  if (document.getElementById('askbetter-glass-defs')) return;
+  if (document.getElementById('mentro-glass-defs')) return;
   const defsSvg = svgEl('svg', {
-    id: 'askbetter-glass-defs',
+    id: 'mentro-glass-defs',
     width: '0',
     height: '0',
   });
@@ -217,7 +217,7 @@ function injectGlassDefs(): void {
 
   const defs = svgEl('defs', {});
   const grad = svgEl('linearGradient', {
-    id: 'askbetter-glass-grad',
+    id: 'mentro-glass-grad',
     x1: '0%',
     y1: '0%',
     x2: '60%',
@@ -237,9 +237,9 @@ function injectGlassDefs(): void {
 // ---------------------------------------------------------------------------
 
 function injectBubbleStyles(): void {
-  if (document.getElementById('askbetter-bubble-style')) return;
+  if (document.getElementById('mentro-bubble-style')) return;
   const style = document.createElement('style');
-  style.id = 'askbetter-bubble-style';
+  style.id = 'mentro-bubble-style';
   style.textContent = `
     .${BUBBLE_CLASS} {
       position: fixed;
@@ -261,11 +261,11 @@ function injectBubbleStyles(): void {
       opacity: 1;
       transform: translateY(0px) scale(1);
     }
-    .askbetter-bubble-svg {
+    .mentro-bubble-svg {
       transition: filter 0.15s ease;
       flex-shrink: 0;
     }
-    .askbetter-bubble-label {
+    .mentro-bubble-label {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 8px;
       font-weight: 700;
@@ -287,17 +287,17 @@ function injectFeedbackStyles(): void {
   const style = document.createElement('style');
   style.id = FEEDBACK_STYLE_ID;
   style.textContent = `
-    @keyframes askbetter-fly-up {
+    @keyframes mentro-fly-up {
       0%   { opacity: 0; transform: translateY(18px) scale(0.92); }
       60%  { opacity: 1; transform: translateY(-4px) scale(1.02); }
       100% { opacity: 1; transform: translateY(0px) scale(1); }
     }
-    @keyframes askbetter-fly-down {
+    @keyframes mentro-fly-down {
       0%   { opacity: 1; transform: translateY(0px) scale(1); }
       100% { opacity: 0; transform: translateY(14px) scale(0.92); }
     }
     .${FEEDBACK_CLASS} {
-      animation: askbetter-fly-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: mentro-fly-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
       max-height: 32px;
       overflow: hidden;
       transition: max-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
@@ -311,7 +311,7 @@ function injectFeedbackStyles(): void {
       overflow: visible;
       z-index: ${BADGE_Z + 50} !important;
     }
-    .${FEEDBACK_CLASS} .askbetter-pill-label {
+    .${FEEDBACK_CLASS} .mentro-pill-label {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: inherit;
@@ -319,7 +319,7 @@ function injectFeedbackStyles(): void {
       line-height: 1.4;
     }
     .${FEEDBACK_CLASS}.hiding {
-      animation: askbetter-fly-down 0.22s ease-in both;
+      animation: mentro-fly-down 0.22s ease-in both;
     }
   `;
   document.head.appendChild(style);
@@ -330,13 +330,13 @@ function injectPulseStyles(): void {
   const style = document.createElement('style');
   style.id = PULSE_STYLE_ID;
   style.textContent = `
-    @keyframes askbetter-pulse {
+    @keyframes mentro-pulse {
       0%   { filter: drop-shadow(0 0 0px rgba(167,139,250,0.0)); }
       50%  { filter: drop-shadow(0 0 8px rgba(167,139,250,0.9)); }
       100% { filter: drop-shadow(0 0 0px rgba(167,139,250,0.0)); }
     }
-    #askbetter-badge-svg.${PULSE_CLASS} {
-      animation: askbetter-pulse 1.2s ease-in-out infinite;
+    #mentro-badge-svg.${PULSE_CLASS} {
+      animation: mentro-pulse 1.2s ease-in-out infinite;
     }
   `;
   document.head.appendChild(style);
@@ -406,7 +406,7 @@ function buildCircleSvg(
       cx,
       cy,
       r: String(INNER_R + 3),
-      fill: 'url(#askbetter-glass-grad)',
+      fill: 'url(#mentro-glass-grad)',
     })
   );
 
@@ -465,13 +465,13 @@ function makeBubble(value: number, index: number): HTMLElement {
   wrapper.dataset.index = String(index);
 
   const { svg } = buildCircleSvg(value, color);
-  svg.classList.add('askbetter-bubble-svg');
+  svg.classList.add('mentro-bubble-svg');
   svg.style.filter = `drop-shadow(0 2px 10px ${color}55)`;
   wrapper.appendChild(svg);
 
   // Label below the circle
   const label = document.createElement('div');
-  label.className = 'askbetter-bubble-label';
+  label.className = 'mentro-bubble-label';
   label.textContent = LABELS[index];
   wrapper.appendChild(label);
 
@@ -665,7 +665,7 @@ function createPillElement(
   `;
 
   const label = document.createElement('span');
-  label.className = 'askbetter-pill-label';
+  label.className = 'mentro-pill-label';
   label.textContent = text;
 
   pill.appendChild(dot);
@@ -847,7 +847,7 @@ export function hideFeedback(instant = false): void {
 
 export function setBadgeLoading(loading: boolean): void {
   injectPulseStyles();
-  const svg = document.getElementById('askbetter-badge-svg');
+  const svg = document.getElementById('mentro-badge-svg');
   if (!svg) return;
   if (loading) svg.classList.add(PULSE_CLASS);
   else svg.classList.remove(PULSE_CLASS);
@@ -880,19 +880,19 @@ export function renderOverlay(
       transition: opacity 0.2s ease;
     `;
 
-    const { svg } = buildCircleSvg(score.overall, color, 'askbetter-badge');
-    svg.setAttribute('id', 'askbetter-badge-svg');
+    const { svg } = buildCircleSvg(score.overall, color, 'mentro-badge');
+    svg.setAttribute('id', 'mentro-badge-svg');
     svg.style.cssText = 'position:absolute;top:0;left:0;transition:filter 0.2s ease;';
     badge.appendChild(svg);
 
     badge.addEventListener('mouseenter', () => {
-      const s = document.getElementById('askbetter-badge-svg');
+      const s = document.getElementById('mentro-badge-svg');
       if (s)
         s.style.filter = `drop-shadow(0 3px 16px ${getScoreColor(currentScore?.overall ?? 0)}88)`;
       showBubbles(badge!);
     });
     badge.addEventListener('mouseleave', (e: MouseEvent) => {
-      const s = document.getElementById('askbetter-badge-svg');
+      const s = document.getElementById('mentro-badge-svg');
       if (s)
         s.style.filter = `drop-shadow(0 2px 10px ${getScoreColor(currentScore?.overall ?? 0)}55)`;
       const rel = e.relatedTarget as HTMLElement | null;
@@ -909,12 +909,12 @@ export function renderOverlay(
   }
 
   // Update SVG elements with new score/color
-  const glassBg = badge.querySelector('#askbetter-badge-glassbg');
+  const glassBg = badge.querySelector('#mentro-badge-glassbg');
   if (glassBg) {
     glassBg.setAttribute('fill', `${color}18`);
     glassBg.setAttribute('stroke', `${color}38`);
   }
-  const arc = badge.querySelector('#askbetter-badge-arc');
+  const arc = badge.querySelector('#mentro-badge-arc');
   if (arc) {
     const circumference = 2 * Math.PI * RING_R;
     const filled = circumference * (score.overall / 100);
@@ -922,13 +922,13 @@ export function renderOverlay(
     arc.setAttribute('stroke', color);
     arc.setAttribute('stroke-dasharray', `${filled} ${gap}`);
   }
-  const text = badge.querySelector('#askbetter-badge-text');
+  const text = badge.querySelector('#mentro-badge-text');
   if (text) {
     text.setAttribute('fill', color);
     const currentVal = parseInt(text.textContent ?? '0', 10);
     animateScoreTo(text, isNaN(currentVal) ? score.overall : currentVal, score.overall);
   }
-  const svg = badge.querySelector('#askbetter-badge-svg') as HTMLElement | null;
+  const svg = badge.querySelector('#mentro-badge-svg') as HTMLElement | null;
   if (svg) svg.style.filter = `drop-shadow(0 2px 10px ${color}55)`;
 
   requestAnimationFrame(() => {

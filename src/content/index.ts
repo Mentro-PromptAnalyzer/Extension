@@ -13,9 +13,9 @@ import {
   hideFeedback,
   attachInputBarHover,
 } from './overlay';
-import { scoreWithOllama } from '../analysis/ollama';
+import { scoreWithGroq } from '../analysis/groq';
 import { extractTopicsTFIDF } from '../analysis/tfidf';
-import type { HeuristicContext } from '../analysis/ollama';
+import type { HeuristicContext } from '../analysis/groq';
 import type { LiveScore } from '../analysis/engine';
 
 // ---------------------------------------------------------------------------
@@ -23,12 +23,12 @@ import type { LiveScore } from '../analysis/engine';
 // ---------------------------------------------------------------------------
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let ollamaTimer: ReturnType<typeof setTimeout> | null = null;
+let groqTimer: ReturnType<typeof setTimeout> | null = null;
 let pulseTimer: ReturnType<typeof setTimeout> | null = null;
 
 const DEBOUNCE_MS = 300;
 const PULSE_DELAY_MS = 600; // delay after heuristic before pulse starts
-const OLLAMA_EXTRA_MS = 1200; // additional wait after heuristic fires (total = 1500 ms from last keystroke)
+const GROQ_EXTRA_MS = 1200; // additional wait after heuristic fires (total = 1500 ms from last keystroke)
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -36,7 +36,7 @@ const OLLAMA_EXTRA_MS = 1200; // additional wait after heuristic fires (total = 
 
 // Generation counter — incremented once per input change so stale AI
 // responses don't overwrite a newer score.
-let currentOllamaGen = 0;
+let currentGroqGen = 0;
 
 // Last text that was fully scored — used to detect real input changes vs
 // observer noise (observer + input + keyup all fire for a single keystroke).
@@ -168,7 +168,7 @@ function safeSendMessage(message: object): void {
 
 function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatform>): void {
   if (debounceTimer) clearTimeout(debounceTimer);
-  if (ollamaTimer) clearTimeout(ollamaTimer);
+  if (groqTimer) clearTimeout(groqTimer);
 
   // Peek at current text before the debounce to decide if pills should hide.
   // Only hide if the text has actually changed from what was last scored —
@@ -186,7 +186,6 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
 
   debounceTimer = setTimeout(() => {
     const text = getInputText(el);
-    // (no per-keystroke logging)
 
     if (text.trim().length < 5) {
       lastScoredText = '';
@@ -206,7 +205,7 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
     safeSendMessage({ type: 'SCORE_UPDATE', score: displayScore });
 
     // Bump generation counter after the heuristic fires
-    const gen = ++currentOllamaGen;
+    const gen = ++currentGroqGen;
 
     // Start pulse after a short delay — feels natural, not jarring
     pulseTimer = setTimeout(() => {
@@ -215,13 +214,13 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
     }, PULSE_DELAY_MS);
 
     // Layer 2: async AI re-score after typing fully settles
-    ollamaTimer = setTimeout(() => {
-      scheduleOllamaScore(text, heuristicScore, displayScore, el, platform, gen);
-    }, OLLAMA_EXTRA_MS);
+    groqTimer = setTimeout(() => {
+      scheduleGroqScore(text, heuristicScore, displayScore, el, platform, gen);
+    }, GROQ_EXTRA_MS);
   }, DEBOUNCE_MS);
 }
 
-async function scheduleOllamaScore(
+async function scheduleGroqScore(
   text: string,
   heuristicScore: LiveScore,
   displayScore: LiveScore,
@@ -230,10 +229,10 @@ async function scheduleOllamaScore(
   gen: number
 ): Promise<void> {
   const heuristicContext = buildHeuristicContext(text, heuristicScore, displayScore);
-  const aiScore = await scoreWithOllama(text, heuristicContext);
+  const aiScore = await scoreWithGroq(text, heuristicContext);
 
   // Guard 1: generation counter — if the user typed again, discard this result
-  if (gen !== currentOllamaGen) return;
+  if (gen !== currentGroqGen) return;
 
   // Guard 2: text match — catches slow in-flight responses from a previous
   // prompt that arrive after the user has already changed the input.
@@ -409,9 +408,9 @@ let contentSettings: ContentSettings = {
 };
 
 // Load persisted settings on startup and apply them
-chrome.storage.sync.get('askbetter_settings', (result) => {
-  if (result['askbetter_settings']) {
-    applySettings(result['askbetter_settings'] as Partial<ContentSettings>);
+chrome.storage.sync.get('mentro_settings', (result) => {
+  if (result['mentro_settings']) {
+    applySettings(result['mentro_settings'] as Partial<ContentSettings>);
   }
 });
 
