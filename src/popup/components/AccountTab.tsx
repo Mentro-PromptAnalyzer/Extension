@@ -6,6 +6,7 @@ import {
   signInWithOAuth,
   signOut,
   fetchLifetimeStats,
+  getValidSession,
   LifetimeStats,
   WordCountBuckets,
 } from '../auth';
@@ -337,7 +338,16 @@ export function AccountTab({ session, onSessionChange }: Props) {
       return;
     }
     setStatsLoading(true);
-    fetchLifetimeStats(session.access_token)
+    // Refresh the token if it's expiring soon before hitting Supabase REST
+    getValidSession()
+      .then((validSession) => {
+        if (!validSession) return Promise.reject(new Error('no session'));
+        // Propagate the refreshed token back up if it changed
+        if (validSession.access_token !== session.access_token) {
+          onSessionChange(validSession);
+        }
+        return fetchLifetimeStats(validSession.access_token);
+      })
       .then(setStats)
       .catch(() => setStats(null))
       .finally(() => setStatsLoading(false));

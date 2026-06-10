@@ -7,11 +7,36 @@ export interface AuthSession {
   access_token: string;
   refresh_token: string;
   email: string;
+  expires_at?: number; // unix seconds — when the access_token expires
 }
 
-const SUPABASE_URL = 'https://anmsstuexchqyghqoipt.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFubXNzdHVleGNocXlnaHFvaXB0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NTYwODIsImV4cCI6MjA5MzMzMjA4Mn0.wwFHPAU2PJEi4brxDVLC-TjGMgbXMkrizCeoyIlpyj0';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+// ---------------------------------------------------------------------------
+// Token helpers
+// ---------------------------------------------------------------------------
+
+/** Decode the `exp` claim from a JWT without verifying the signature. */
+function jwtExp(token: string): number | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    // base64url → base64 → JSON
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const parsed = JSON.parse(json) as { exp?: number };
+    return typeof parsed.exp === 'number' ? parsed.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True if the access token expires within the next 5 minutes (or is already expired). */
+function isTokenExpiringSoon(session: AuthSession): boolean {
+  const exp = session.expires_at ?? jwtExp(session.access_token);
+  if (exp == null) return false; // can't tell — assume OK
+  return Date.now() / 1000 > exp - 300; // 5-minute buffer
+}
 
 // ---------------------------------------------------------------------------
 // Session storage
@@ -31,6 +56,55 @@ export function saveSession(session: AuthSession | null): void {
   } else {
     chrome.storage.local.remove('askbetter_session');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Token refresh
+// ---------------------------------------------------------------------------
+
+/**
+ * Exchange a refresh_token for a new access_token.
+ * Persists the updated session and returns it, or null on failure.
+ */
+export async function refreshSession(session: AuthSession): Promise<AuthSession | null> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      access_token?: string;
+      refresh_token?: string;
+      expires_at?: number;
+      user?: { email?: string };
+    };
+    if (!data.access_token) return null;
+    const updated: AuthSession = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token ?? session.refresh_token,
+      email: data.user?.email ?? session.email,
+      expires_at: data.expires_at ?? jwtExp(data.access_token) ?? undefined,
+    };
+    saveSession(updated);
+    return updated;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load the stored session and refresh the access token if it's expiring soon.
+ * Returns the (possibly refreshed) session, or null if not signed in or refresh fails.
+ */
+export async function getValidSession(): Promise<AuthSession | null> {
+  const session = await loadSession();
+  if (!session) return null;
+  if (!isTokenExpiringSoon(session)) return session;
+  // Token is stale — try to refresh silently
+  const refreshed = await refreshSession(session);
+  return refreshed ?? session; // fall back to stale session if refresh fails
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +136,7 @@ export async function signInWithPassword(
         access_token: data.access_token,
         refresh_token: data.refresh_token ?? '',
         email: data.user?.email ?? email,
+        expires_at: jwtExp(data.access_token) ?? undefined,
       },
     };
   } catch {

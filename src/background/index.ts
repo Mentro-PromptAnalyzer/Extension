@@ -59,7 +59,7 @@ type Message =
 // Groq (via Fly.dev backend) config
 // ---------------------------------------------------------------------------
 
-const SCORE_URL = 'https://askbetter-kirohacks.fly.dev/api/chat/stream';
+const SCORE_URL = import.meta.env.VITE_SCORE_URL as string;
 const TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
@@ -320,9 +320,8 @@ async function fetchOllamaScore(
 // OAuth — runs in the background worker so the context survives popup close
 // ---------------------------------------------------------------------------
 
-const SUPABASE_URL = 'https://anmsstuexchqyghqoipt.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFubXNzdHVleGNocXlnaHFvaXB0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NTYwODIsImV4cCI6MjA5MzMzMjA4Mn0.wwFHPAU2PJEi4brxDVLC-TjGMgbXMkrizCeoyIlpyj0';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 async function handleOAuthSignIn(
   provider: 'google' | 'github'

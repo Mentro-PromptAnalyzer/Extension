@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TipsTab } from './TipsTab';
 import { SettingsTab } from './SettingsTab';
 import { AccountTab } from './AccountTab';
-import { AuthSession, loadSession } from '../auth';
+import { AuthSession, loadSession, getValidSession } from '../auth';
 import { Settings, loadSettings, DEFAULT_SETTINGS } from '../settings';
 
 type Tab = 'tips' | 'settings' | 'account';
@@ -93,7 +93,7 @@ export function App() {
   const platform = usePlatform();
 
   useEffect(() => {
-    Promise.all([loadSession(), loadSettings()]).then(([s, st]) => {
+    Promise.all([getValidSession(), loadSettings()]).then(([s, st]) => {
       setSession(s);
       setSettings(st);
       setReady(true);
