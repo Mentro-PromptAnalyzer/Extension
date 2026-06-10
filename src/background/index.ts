@@ -10,6 +10,22 @@ import type { LiveScore } from '../analysis/engine';
 import type { HeuristicContext } from '../analysis/ollama';
 
 // ---------------------------------------------------------------------------
+// JWT helper — decode exp claim without verifying signature
+// ---------------------------------------------------------------------------
+
+function jwtExpBg(token: string): number | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const parsed = JSON.parse(json) as { exp?: number };
+    return typeof parsed.exp === 'number' ? parsed.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Message types
 // ---------------------------------------------------------------------------
 
@@ -192,9 +208,6 @@ async function fetchOllamaScore(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    console.log('[AskBetter:bg] Fetching AI score...');
-    const t0 = Date.now();
-
     const accessToken = await getAccessToken();
     if (!accessToken) {
       // No session — skip AI scoring
@@ -219,7 +232,6 @@ async function fetchOllamaScore(
       body: JSON.stringify({ messages }),
     });
 
-    console.log(`[AskBetter:bg] HTTP ${res.status} (${Date.now() - t0}ms)`);
     if (!res.ok) return null;
 
     // Stream SSE tokens and accumulate the full response text
@@ -306,10 +318,8 @@ async function fetchOllamaScore(
       : [];
 
     const result = { ownership, depth, critical, clarity, overall, intent, suggestions };
-    console.log(`[AskBetter:bg] Score: ${overall}`);
     return result;
-  } catch (err) {
-    console.log('[AskBetter:bg] Fetch error:', err instanceof Error ? err.message : err);
+  } catch {
     return null;
   } finally {
     clearTimeout(timer);
@@ -367,6 +377,7 @@ async function handleOAuthSignIn(
       access_token: accessToken,
       refresh_token: refreshToken,
       email: userData.email ?? '',
+      expires_at: jwtExpBg(accessToken) ?? undefined,
     };
 
     // Save session here in the background — survives popup close
@@ -374,7 +385,6 @@ async function handleOAuthSignIn(
       chrome.storage.local.set({ askbetter_session: session }, resolve);
     });
 
-    console.log('[AskBetter:bg] OAuth session saved for', userData.email);
     return { session };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'OAuth sign-in failed.';
@@ -415,7 +425,6 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
 
   if (message.type === 'PROMPT_SUBMITTED') {
     latestScore = message.score;
-    console.log(`[AskBetter] Prompt submitted, score: ${message.score.overall}`);
     sendResponse({ ok: true });
     return true;
   }

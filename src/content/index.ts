@@ -229,8 +229,6 @@ async function scheduleOllamaScore(
   platform: ReturnType<typeof detectPlatform>,
   gen: number
 ): Promise<void> {
-  console.log('[AskBetter] AI scoring...');
-
   const heuristicContext = buildHeuristicContext(text, heuristicScore, displayScore);
   const aiScore = await scoreWithOllama(text, heuristicContext);
 
@@ -245,7 +243,6 @@ async function scheduleOllamaScore(
   setBadgeLoading(false);
 
   if (!aiScore) {
-    console.log('[AskBetter] AI unavailable — using heuristic suggestions');
     if (contentSettings.pillsEnabled) {
       renderFeedback(heuristicScore.suggestions, heuristicScore, el, platform ?? undefined);
     }
@@ -271,9 +268,6 @@ async function scheduleOllamaScore(
         : heuristicScore.suggestions,
   };
 
-  console.log(`[AskBetter] AI score: ${merged.overall}`);
-
-  // Store AI score so subsequent heuristic renders can blend toward it
   lastAiScore = merged as LiveScore;
   lastAiText = text;
 
@@ -296,8 +290,6 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
     activeObserver = null;
   }
   activeInput = input;
-
-  console.log(`[AskBetter] Attaching to input on ${platform?.name}`);
 
   // Score immediately — text may already be present
   onInputChange(input, platform);
@@ -345,8 +337,6 @@ function init(): void {
   const platform = detectPlatform();
   if (!platform) return;
 
-  console.log(`[AskBetter] Platform: ${platform.name}`);
-
   const pollInterval = setInterval(() => {
     const input = findInputElement(platform);
     if (!input) return;
@@ -359,7 +349,6 @@ function init(): void {
       setInterval(() => {
         const current = findInputElement(platform);
         if (current && current !== activeInput) {
-          console.log('[AskBetter] Input replaced, re-attaching');
           attachToInput(current, platform);
         }
       }, 1000);

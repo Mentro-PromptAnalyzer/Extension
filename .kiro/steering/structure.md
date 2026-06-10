@@ -40,13 +40,13 @@ src/                 # All source TypeScript/TSX
 
 | File | Responsibility |
 |---|---|
-| `index.ts` | Receives `SCORE_UPDATE` and `PROMPT_SUBMITTED` messages from content script; serves `GET_LATEST_SCORE` to popup; proxies `OLLAMA_SCORE` requests to `http://localhost:11434`. `buildPreAnalysis(heuristic)` is an extracted helper that builds the pre-analysis block injected into the Ollama prompt (detected intent, key topics, heuristic scores, weakest dimensions, detected signals, baseline scores). `SYSTEM_PROMPT` constant is defined after the message handlers for readability. |
+| `index.ts` | Receives `SCORE_UPDATE` and `PROMPT_SUBMITTED` messages from content script; serves `GET_LATEST_SCORE` to popup; proxies `OLLAMA_SCORE` requests to Fly.dev (`VITE_SCORE_URL`). `jwtExpBg(token)` is a module-level JWT helper that decodes the `exp` claim without signature verification — used to populate `expires_at` on the OAuth session returned by `handleOAuthSignIn`. `buildPreAnalysis(heuristic)` is an extracted helper that builds the pre-analysis block injected into the AI prompt (detected intent, key topics, heuristic scores, weakest dimensions, detected signals, baseline scores). `SYSTEM_PROMPT` constant is defined after the message handlers for readability. |
 
 ### `src/popup/` — Extension popup (React)
 
 | File | Responsibility |
 |---|---|
-| `main.tsx` | Entry point — mounts `<App />` into `#root` via `createRoot`, imports `popup.css` |
+| `main.tsx` | Entry point — mounts `<App />` wrapped in `<ErrorBoundary>` into `#root` via `createRoot`, imports `popup.css` |
 | `popup.css` | All popup styles — extracted from old inline HTML, imported by `main.tsx` |
 | `auth.ts` | Supabase auth functions: `loadSession`, `saveSession`, `signInWithPassword`, `signOut`, `signInWithOAuth`, `fetchLifetimeStats`. All calls are direct `fetch` to Supabase REST — no SDK. Exports `AuthSession`, `SessionRow` (includes `analysis_result` jsonb with `prompts[].wordCount`), `WordCountBuckets`, and `LifetimeStats` types. `fetchLifetimeStats(accessToken)` queries `chat_histories` (including `analysis_result`) and `analysis_history` — RLS scopes to current user. Returns `{ totalPrompts, avgScore, totalSessions, topPlatform, sessions, platformCounts, platformAvgScores, wordCountBuckets }`. `wordCountBuckets` aggregates `wordCount` from all prompts across all sessions into Short (1–15), Medium (16–50), Long (51+) buckets. |
 | `settings.ts` | Settings persistence: `loadSettings`, `saveSettings`, `Settings` interface, `DEFAULT_SETTINGS`. `saveSettings` broadcasts `SETTINGS_UPDATE` to all content scripts. |
