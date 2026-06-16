@@ -333,6 +333,15 @@ async function fetchGroqScore(
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
+/**
+ * Signs in a user with an OAuth provider via Supabase.
+ *
+ * Launches the browser's OAuth authentication flow, extracts tokens from the callback URL,
+ * fetches user information, and stores the session in local storage for persistence across
+ * popup reloads.
+ *
+ * @returns An object with either a `session` containing the access token, refresh token, user email, and token expiration, or an `error` string
+ */
 async function handleOAuthSignIn(
   provider: 'google' | 'github'
 ): Promise<
