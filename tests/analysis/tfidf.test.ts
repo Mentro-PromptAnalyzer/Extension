@@ -7,8 +7,8 @@ import {
   QUALIFIER_PENALTY,
   UNKNOWN_WORD_IDF,
   MAX_TOPIC_WORDS,
-} from './tfidf';
-import { STOP_WORDS } from './stopWords';
+} from '../../src/analysis/tfidf';
+import { STOP_WORDS } from '../../src/analysis/stopWords';
 
 // ---------------------------------------------------------------------------
 // Exported constants
@@ -132,10 +132,10 @@ describe('extractTopicsTFIDF', () => {
       STOP_WORDS,
       3,
     );
-    // All three should be distinct strings (non-overlapping content)
-    const unique = new Set(results);
-    // Padded results are acceptable, but at least the first two should differ
-    // if the prompt has enough content
+    // The prompt has enough distinct technical terms that all 3 spans should differ.
     expect(results[0]).toBeTruthy();
+    expect(results[0]).not.toBe(results[1]);
+    expect(results[1]).not.toBe(results[2]);
+    expect(new Set(results).size).toBe(3);
   });
 });

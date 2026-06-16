@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { detectFlags, scorePromptQuality, computeQualityScore, CONTEXT_SIGNALS } from './rubric';
+import {
+  detectFlags,
+  scorePromptQuality,
+  computeQualityScore,
+  CONTEXT_SIGNALS,
+} from '../../src/analysis/rubric';
 
 // ---------------------------------------------------------------------------
 // CONTEXT_SIGNALS export
@@ -60,10 +65,8 @@ describe('detectFlags', () => {
   });
 
   it('copy_paste_without_question fires for long unstructured text without ?', () => {
-    // Build a >100 word blob with no question mark and no structure signals
     const blob = Array(110).fill('blah').join(' ');
-    const flags = detectFlags(blob);
-    expect(flags).toContain('copy_paste_without_question');
+    expect(detectFlags(blob)).toContain('copy_paste_without_question');
   });
 
   it('copy_paste_without_question does NOT fire when ? present', () => {
@@ -77,7 +80,6 @@ describe('detectFlags', () => {
   });
 
   it('copy_paste_without_question does NOT fire for short prompts', () => {
-    // Only 5 words — well under the 100-word threshold
     expect(detectFlags('this is my short prompt')).not.toContain('copy_paste_without_question');
   });
 });
@@ -136,8 +138,7 @@ describe('computeQualityScore', () => {
   });
 
   it('works without an intent (defaults to equal weights)', () => {
-    const score = computeQualityScore(fullScores);
-    expect(score).toBe(80);
+    expect(computeQualityScore(fullScores)).toBe(80);
   });
 
   it('all-zero scores produce 0', () => {
@@ -190,17 +191,12 @@ describe('scorePromptQuality', () => {
 
   it('very short prompts (1 word) produce low scores', () => {
     const q = scorePromptQuality('help', [], 'delegation');
-    // Every dimension should be well below 50 for a single-word prompt
     expect(q.autonomy).toBeLessThan(50);
     expect(q.specificity).toBeLessThan(50);
   });
 
   it('structured long delegation prompt scores higher than vague one', () => {
-    const vague = scorePromptQuality(
-      'write some code for me please',
-      [],
-      'delegation',
-    );
+    const vague = scorePromptQuality('write some code for me please', [], 'delegation');
     const structured = scorePromptQuality(
       'You are a senior TypeScript engineer. Your task is to write a paginated REST API endpoint ' +
         'using Express and PostgreSQL. Requirements: JWT auth, input validation, error handling. ' +
@@ -208,8 +204,8 @@ describe('scorePromptQuality', () => {
       ['shows_prior_attempt', 'asks_for_risk_or_limitations'],
       'delegation',
     );
-    const vagueScore = computeQualityScore(vague, 'delegation');
-    const structuredScore = computeQualityScore(structured, 'delegation');
-    expect(structuredScore).toBeGreaterThan(vagueScore);
+    expect(computeQualityScore(structured, 'delegation')).toBeGreaterThan(
+      computeQualityScore(vague, 'delegation'),
+    );
   });
 });

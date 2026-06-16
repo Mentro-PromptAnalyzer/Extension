@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { STOP_WORDS } from './stopWords';
+import { STOP_WORDS } from '../../src/analysis/stopWords';
 
 describe('STOP_WORDS', () => {
   it('is a Set', () => {

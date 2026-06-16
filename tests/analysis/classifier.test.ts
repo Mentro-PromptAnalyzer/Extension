@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { scoreIntents, primaryIntentFrom } from './classifier';
-import type { IntentScores } from './types';
+import { scoreIntents, primaryIntentFrom } from '../../src/analysis/classifier';
+import type { IntentScores } from '../../src/analysis/types';
 
 // ---------------------------------------------------------------------------
 // scoreIntents
@@ -48,8 +48,9 @@ describe('scoreIntents', () => {
   });
 
   it('counts partial matches within words (substring match behaviour)', () => {
-    // 'fix' matches inside 'prefix' — this is intentional/documented behaviour
-    const s = scoreIntents('fix the bug');
+    // 'fix' is a delegation signal and matches as a substring inside 'prefix' —
+    // countSignals uses String.includes(), so word boundaries are not enforced.
+    const s = scoreIntents('please prefix your output with a label');
     expect(s.delegation).toBeGreaterThanOrEqual(1);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzePrompt } from './engine';
+import { analyzePrompt } from '../../src/analysis/engine';
 
 // ---------------------------------------------------------------------------
 // Output shape
@@ -54,7 +54,7 @@ describe('analyzePrompt — short input', () => {
     expect(analyzePrompt('hi').intent).toBe('unknown');
   });
 
-  it('returns empty string for empty input', () => {
+  it('returns all zeros for empty input', () => {
     const result = analyzePrompt('');
     expect(result.overall).toBe(0);
     expect(result.intent).toBe('unknown');
@@ -76,23 +76,25 @@ describe('analyzePrompt — intent classification', () => {
   });
 
   it('classifies a task request as delegation', () => {
-    const result = analyzePrompt('Write me a Python function to reverse a linked list');
-    expect(result.intent).toBe('delegation');
+    expect(analyzePrompt('Write me a Python function to reverse a linked list').intent).toBe(
+      'delegation',
+    );
   });
 
   it('classifies a verification request', () => {
-    const result = analyzePrompt('Check this code and verify it is correct');
-    expect(result.intent).toBe('verification');
+    expect(analyzePrompt('Check this code and verify it is correct').intent).toBe('verification');
   });
 
   it('classifies a collaborative request', () => {
-    const result = analyzePrompt("What do you think about this approach? Let's brainstorm");
-    expect(result.intent).toBe('collaborative');
+    expect(
+      analyzePrompt("What do you think about this approach? Let's brainstorm").intent,
+    ).toBe('collaborative');
   });
 
   it('intent is never "unknown" for a real prompt', () => {
-    const result = analyzePrompt('How do I implement binary search in JavaScript?');
-    expect(result.intent).not.toBe('unknown');
+    expect(analyzePrompt('How do I implement binary search in JavaScript?').intent).not.toBe(
+      'unknown',
+    );
   });
 });
 
@@ -135,26 +137,11 @@ describe('analyzePrompt — score ranges', () => {
 
 describe('analyzePrompt — suggestions', () => {
   it('returns at most 3 suggestions', () => {
-    const result = analyzePrompt('write a function');
-    expect(result.suggestions.length).toBeLessThanOrEqual(3);
-  });
-
-  it('returns no suggestions when all dimensions are healthy (≥ 60)', () => {
-    // A very high-quality prompt should have no weak dimensions
-    const prompt =
-      'You are a senior software architect. Your task is to review my microservice design. ' +
-      "Here's what I have: three services communicating via gRPC with a shared PostgreSQL DB. " +
-      "I've tried separating concerns but queries are getting complex. " +
-      'What are the risks, alternatives, and edge cases I should consider? ' +
-      'Format as bullet points for a team of mid-level engineers.';
-    const result = analyzePrompt(prompt);
-    // Either no suggestions or suggestions that reference real topics
-    expect(result.suggestions.length).toBeLessThanOrEqual(3);
+    expect(analyzePrompt('write a function').suggestions.length).toBeLessThanOrEqual(3);
   });
 
   it('suggestion strings are non-empty', () => {
-    const result = analyzePrompt('fix my code');
-    for (const s of result.suggestions) {
+    for (const s of analyzePrompt('fix my code').suggestions) {
       expect(s.length).toBeGreaterThan(0);
     }
   });
@@ -165,8 +152,7 @@ describe('analyzePrompt — suggestions', () => {
 // ---------------------------------------------------------------------------
 
 describe('analyzePrompt — clarity', () => {
-  it('clarity is the average of specificity and context (both integers)', () => {
-    // We can't access internal quality directly, but we can verify the field is valid
+  it('clarity is between 0 and 100', () => {
     const result = analyzePrompt('How do I use async/await in JavaScript?');
     expect(result.clarity).toBeGreaterThanOrEqual(0);
     expect(result.clarity).toBeLessThanOrEqual(100);
