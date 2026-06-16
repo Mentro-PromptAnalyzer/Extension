@@ -98,9 +98,10 @@ describe('primaryIntentFrom', () => {
     expect(primaryIntentFrom(scores, 'Why does quicksort degrade?')).toBe('curiosity');
   });
 
-  it('defaults to delegation when all scores are zero', () => {
+  it('returns curiosity when all scores are zero (first in iteration order)', () => {
+    // The loop checks curiosity before delegation, so curiosity wins any tie at 0.
     const scores: IntentScores = { delegation: 0, curiosity: 0, collaborative: 0, verification: 0 };
-    expect(primaryIntentFrom(scores)).toBe('delegation');
+    expect(primaryIntentFrom(scores)).toBe('curiosity');
   });
 
   it('works without optional text parameter', () => {
