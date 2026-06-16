@@ -339,7 +339,11 @@ async function handleOAuthSignIn(
   { session: { access_token: string; refresh_token: string; email: string } } | { error: string }
 > {
   try {
-    const redirectUrl = chrome.identity.getRedirectURL('auth');
+    // Construct the redirect URL manually to ensure an https:// scheme.
+    // chrome.identity.getRedirectURL() can return a non-https scheme on
+    // non-Chrome Chromium browsers (e.g. Arc on Windows), which causes
+    // launchWebAuthFlow to throw "auth url has an invalid scheme".
+    const redirectUrl = `https://${chrome.runtime.id}.chromiumapp.org/auth`;
     const authUrl =
       `${SUPABASE_URL}/auth/v1/authorize` +
       `?provider=${provider}` +
