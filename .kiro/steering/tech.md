@@ -24,15 +24,24 @@
 ## Type Checking
 
 - `@types/chrome` for Chrome extension APIs
-- No separate test framework is configured
+
+## Testing
+
+- **Unit tests**: Vitest (`npm run test`) — `tests/analysis/` covers classifier, engine, rubric, stopWords, tfidf
+- **E2E tests**: Playwright (`npm run test:e2e`) — `tests/e2e/` loads the built extension in a real Chromium context and smoke-tests the popup UI
+- Coverage via `@vitest/coverage-v8` (`npm run test:coverage`)
+- E2E requires a built `dist/` — run `npm run build` first
 
 ## Common Commands
 
 ```bash
-npm run dev        # Vite build in watch mode (for development)
-npm run build      # Single production build
-npm run typecheck  # tsc --noEmit, no emit, type errors only
-npm run format     # Prettier — formats src/**/*.{ts,tsx} and popup.html in place
+npm run dev           # Vite build in watch mode (for development)
+npm run build         # Single production build
+npm run typecheck     # tsc --noEmit, no emit, type errors only
+npm run format        # Prettier — formats src/**/*.{ts,tsx} and popup.html in place
+npm run test          # Vitest unit tests (single run)
+npm run test:coverage # Vitest with coverage report
+npm run test:e2e      # Playwright E2E tests (requires built dist/)
 ```
 
 ## Loading the Extension Locally
@@ -56,6 +65,9 @@ All dependencies are `devDependencies` — nothing ships at runtime except the c
 | `@vitejs/plugin-react` | JSX transform for React (4.4.1 pinned) |
 | `@types/react` | React types |
 | `@types/react-dom` | React DOM types |
+| `@playwright/test` | E2E test framework |
+| `@vitest/coverage-v8` | Coverage reporter for Vitest |
+| `vitest` | Unit test runner |
 
 Runtime dependencies (ship in `dist/popup.js`):
 
