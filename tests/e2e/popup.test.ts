@@ -86,7 +86,8 @@ test.describe('Popup smoke tests', () => {
     await settingsTab.click();
 
     // SettingsTab renders badge and pills toggles.
-    const toggles = page.locator('input[type="checkbox"], [role="switch"]');
+    // The checkbox inputs are visually hidden by CSS — target the visible toggle-track instead.
+    const toggles = page.locator('.toggle-track');
     await expect(toggles.first()).toBeVisible({ timeout: 3_000 });
   });
 });

@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
 
@@ -39,12 +39,14 @@ jobs:
   e2e:
     name: E2E smoke tests (popup)
     runs-on: ubuntu-latest
-    # E2E only needs to run after a successful build — unit job validates types,
-    # but we rebuild here so the dist/ is fresh for this job.
+    needs: unit
+    # Only runs after unit tests pass — fail-fast so E2E doesn't waste runner
+    # time when type check or unit tests are already broken.
+    # Each job runs on a fresh runner, so the extension is rebuilt here.
 
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
 
@@ -73,7 +75,7 @@ jobs:
 
       - name: Upload Playwright report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: playwright-report
           path: playwright-report/

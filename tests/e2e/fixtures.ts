@@ -28,6 +28,7 @@ export const test = base.extend<ExtensionFixtures>({
   context: async ({}, use) => {
     const ctx = await chromium.launchPersistentContext('', {
       headless: true,
+      channel: 'chromium',
       args: [
         `--disable-extensions-except=${EXTENSION_ROOT}`,
         `--load-extension=${EXTENSION_ROOT}`,
