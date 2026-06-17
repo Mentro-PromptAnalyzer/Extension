@@ -10,6 +10,10 @@
 
 import { test as base, chromium, type BrowserContext } from '@playwright/test';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // The extension root is two directories up from tests/e2e/
 const EXTENSION_ROOT = path.resolve(__dirname, '..', '..');
