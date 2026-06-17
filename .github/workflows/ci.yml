@@ -7,7 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  # ── Job 1: unit tests + type check ──────────────────────────────────────────
+  unit:
     name: Unit tests + coverage
     runs-on: ubuntu-latest
 
@@ -33,3 +34,47 @@ jobs:
         run: npm run test:coverage
         # vitest exits non-zero when thresholds are not met,
         # which will fail the PR check automatically.
+
+  # ── Job 2: E2E popup smoke tests ────────────────────────────────────────────
+  e2e:
+    name: E2E smoke tests (popup)
+    runs-on: ubuntu-latest
+    # E2E only needs to run after a successful build — unit job validates types,
+    # but we rebuild here so the dist/ is fresh for this job.
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build
+        env:
+          # The background worker reads this at runtime via import.meta.env.
+          # Provide a placeholder so the build doesn't fail — E2E tests never
+          # hit the Fly.dev backend.
+          VITE_SCORE_URL: https://placeholder.invalid
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E smoke tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
