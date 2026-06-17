@@ -10,9 +10,6 @@
 
 import { test as base, chromium, type BrowserContext } from '@playwright/test';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The extension root is two directories up from tests/e2e/
 const EXTENSION_ROOT = path.resolve(__dirname, '..', '..');
@@ -32,7 +29,6 @@ export const test = base.extend<ExtensionFixtures>({
         `--load-extension=${EXTENSION_ROOT}`,
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        // Suppress the "Chrome is being controlled" banner in CI.
         '--disable-infobars',
       ],
     });

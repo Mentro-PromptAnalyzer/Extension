@@ -1,5 +1,4 @@
 import { defineConfig } from '@playwright/test';
-import path from 'path';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -8,7 +7,6 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
 
   use: {
-    // Each test gets its own browser context via fixtures — no shared baseURL needed.
     headless: true,
   },
 
@@ -22,7 +20,4 @@ export default defineConfig({
       },
     },
   ],
-
-  // Do not run vitest unit tests — those are a separate script.
-  // This config is only for E2E tests under tests/e2e/.
 });
