@@ -20,4 +20,19 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    environment: 'node',
+    include: ['tests/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/analysis/**'],
+      exclude: ['src/analysis/idfTable.ts'],
+      reporter: ['text', 'lcov'],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 75,
+      },
+    },
+  },
 });
