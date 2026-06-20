@@ -13,9 +13,9 @@ import {
   hideFeedback,
   attachInputBarHover,
 } from './overlay';
-import { scoreWithGroq } from '../analysis/groq';
+import { scoreWithAI } from '../analysis/ai';
 import { extractTopicsTFIDF } from '../analysis/tfidf';
-import type { HeuristicContext } from '../analysis/groq';
+import type { HeuristicContext } from '../analysis/ai';
 import type { LiveScore } from '../analysis/engine';
 
 // ---------------------------------------------------------------------------
@@ -23,12 +23,12 @@ import type { LiveScore } from '../analysis/engine';
 // ---------------------------------------------------------------------------
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let groqTimer: ReturnType<typeof setTimeout> | null = null;
+let aiTimer: ReturnType<typeof setTimeout> | null = null;
 let pulseTimer: ReturnType<typeof setTimeout> | null = null;
 
 const DEBOUNCE_MS = 300;
 const PULSE_DELAY_MS = 600; // delay after heuristic before pulse starts
-const GROQ_EXTRA_MS = 1200; // additional wait after heuristic fires (total = 1500 ms from last keystroke)
+const AI_EXTRA_MS = 1200; // additional wait after heuristic fires (total = 1500 ms from last keystroke)
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -36,7 +36,7 @@ const GROQ_EXTRA_MS = 1200; // additional wait after heuristic fires (total = 15
 
 // Generation counter — incremented once per input change so stale AI
 // responses don't overwrite a newer score.
-let currentGroqGen = 0;
+let currentAIGen = 0;
 
 // Last text that was fully scored — used to detect real input changes vs
 // observer noise (observer + input + keyup all fire for a single keystroke).
@@ -168,7 +168,7 @@ function safeSendMessage(message: object): void {
 
 function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatform>): void {
   if (debounceTimer) clearTimeout(debounceTimer);
-  if (groqTimer) clearTimeout(groqTimer);
+  if (aiTimer) clearTimeout(aiTimer);
 
   // Peek at current text before the debounce to decide if pills should hide.
   // Only hide if the text has actually changed from what was last scored —
@@ -205,7 +205,7 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
     safeSendMessage({ type: 'SCORE_UPDATE', score: displayScore });
 
     // Bump generation counter after the heuristic fires
-    const gen = ++currentGroqGen;
+    const gen = ++currentAIGen;
 
     // Start pulse after a short delay — feels natural, not jarring
     pulseTimer = setTimeout(() => {
@@ -214,13 +214,13 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
     }, PULSE_DELAY_MS);
 
     // Layer 2: async AI re-score after typing fully settles
-    groqTimer = setTimeout(() => {
-      scheduleGroqScore(text, heuristicScore, displayScore, el, platform, gen);
-    }, GROQ_EXTRA_MS);
+    aiTimer = setTimeout(() => {
+      scheduleAIScore(text, heuristicScore, displayScore, el, platform, gen);
+    }, AI_EXTRA_MS);
   }, DEBOUNCE_MS);
 }
 
-async function scheduleGroqScore(
+async function scheduleAIScore(
   text: string,
   heuristicScore: LiveScore,
   displayScore: LiveScore,
@@ -229,10 +229,10 @@ async function scheduleGroqScore(
   gen: number
 ): Promise<void> {
   const heuristicContext = buildHeuristicContext(text, heuristicScore, displayScore);
-  const aiScore = await scoreWithGroq(text, heuristicContext);
+  const aiScore = await scoreWithAI(text, heuristicContext);
 
   // Guard 1: generation counter — if the user typed again, discard this result
-  if (gen !== currentGroqGen) return;
+  if (gen !== currentAIGen) return;
 
   // Guard 2: text match — catches slow in-flight responses from a previous
   // prompt that arrive after the user has already changed the input.
