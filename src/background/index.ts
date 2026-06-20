@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import type { LiveScore } from '../analysis/engine';
-import type { HeuristicContext } from '../analysis/groq';
+import type { HeuristicContext } from '../analysis/ai';
 
 // ---------------------------------------------------------------------------
 // JWT helper — decode exp claim without verifying signature
@@ -40,8 +40,8 @@ interface PromptMessage {
   score: LiveScore;
 }
 
-interface GroqRequest {
-  type: 'GROQ_SCORE';
+interface AIScoreRequest {
+  type: 'AI_SCORE';
   text: string;
   heuristic?: HeuristicContext;
 }
@@ -66,13 +66,13 @@ interface GetLatestScore {
 type Message =
   | ScoreMessage
   | PromptMessage
-  | GroqRequest
+  | AIScoreRequest
   | OAuthRequest
   | SettingsUpdate
   | GetLatestScore;
 
 // ---------------------------------------------------------------------------
-// Groq (via Fly.dev backend) config
+// AI scoring backend config
 // ---------------------------------------------------------------------------
 
 const SCORE_URL = import.meta.env.VITE_SCORE_URL as string;
@@ -193,14 +193,14 @@ Use the key topics and weak dimensions above to write suggestions that are speci
 }
 
 // ---------------------------------------------------------------------------
-// Groq fetch (via Fly.dev /api/chat/stream — SSE)
+// AI fetch (via Fly.dev /api/chat/stream — SSE)
 // ---------------------------------------------------------------------------
 
 function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-async function fetchGroqScore(
+async function fetchAIScore(
   text: string,
   heuristic?: HeuristicContext
 ): Promise<Partial<LiveScore> | null> {
@@ -209,10 +209,7 @@ async function fetchGroqScore(
 
   try {
     const accessToken = await getAccessToken();
-    if (!accessToken) {
-      // No session — skip AI scoring
-      return null;
-    }
+    if (!accessToken) return null;
 
     const preAnalysis = heuristic ? buildPreAnalysis(heuristic) : '';
     const userContent = `${preAnalysis}\n\nPrompt to evaluate:\n${text}`;
@@ -232,7 +229,14 @@ async function fetchGroqScore(
       body: JSON.stringify({ messages }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (res.status === 429) {
+        console.warn('[score] Rate limited (429) — heuristic score will be used.');
+      } else {
+        console.warn(`[score] Server returned ${res.status}`);
+      }
+      return null;
+    }
 
     // Stream SSE tokens and accumulate the full response text
     const reader = res.body?.getReader();
@@ -281,7 +285,7 @@ async function fetchGroqScore(
     const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
-    const parsed = JSON.parse(jsonMatch[0]) as {
+    let parsed: {
       ownership?: number;
       depth?: number;
       critical?: number;
@@ -290,6 +294,11 @@ async function fetchGroqScore(
       intent?: string;
       suggestions?: unknown[];
     };
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      return null;
+    }
 
     if (
       typeof parsed.ownership !== 'number' ||
@@ -319,7 +328,13 @@ async function fetchGroqScore(
 
     const result = { ownership, depth, critical, clarity, overall, intent, suggestions };
     return result;
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('aborted') || msg.includes('abort')) {
+      console.warn(`[score] Request timed out after ${TIMEOUT_MS}ms`);
+    } else {
+      console.error('[score] Unexpected error in fetchAIScore:', msg);
+    }
     return null;
   } finally {
     clearTimeout(timer);
@@ -433,9 +448,9 @@ chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) =
     return true;
   }
 
-  if (message.type === 'GROQ_SCORE') {
+  if (message.type === 'AI_SCORE') {
     // Proxy the AI fetch and return the result asynchronously
-    fetchGroqScore(message.text, message.heuristic).then((score) => {
+    fetchAIScore(message.text, message.heuristic).then((score) => {
       sendResponse({ score });
     });
     return true; // keep message channel open for async response

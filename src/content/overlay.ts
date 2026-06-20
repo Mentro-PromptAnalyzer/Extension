@@ -41,7 +41,7 @@ let currentScore: LiveScore | null = null;
 let bubblesVisible = false;
 let feedbackVisible = false;
 
-// Pending feedback — stored when Groq responds, rendered on input bar hover
+// Pending feedback — stored when AI responds, rendered on input bar hover
 let pendingSuggestions: string[] = [];
 let pendingScores: Pick<LiveScore, 'ownership' | 'depth' | 'critical' | 'clarity'> | null = null;
 let pendingInputEl: HTMLElement | null = null;
