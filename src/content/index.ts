@@ -10,6 +10,7 @@ import {
   hideOverlay,
   setBadgeLoading,
   renderFeedback,
+  renderLoginPrompt,
   hideFeedback,
   attachInputBarHover,
 } from './overlay';
@@ -49,6 +50,46 @@ let lastAiText = '';
 
 let activeInput: HTMLElement | null = null;
 let activeObserver: MutationObserver | null = null;
+
+// ---------------------------------------------------------------------------
+// Auth state — read once at startup, kept live via storage change listener.
+// Used to decide whether to show suggestion pills or a login CTA pill.
+// ---------------------------------------------------------------------------
+
+let isLoggedIn = false;
+
+chrome.storage.local.get('mentro_session', (result) => {
+  isLoggedIn = !!result['mentro_session'];
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && 'mentro_session' in changes) {
+    const wasLoggedIn = isLoggedIn;
+    isLoggedIn = !!changes['mentro_session'].newValue;
+
+    // User just signed in while the tab is open — re-score immediately so the
+    // login CTA pill is replaced with real AI feedback if there's already text
+    // in the input bar.
+    if (!wasLoggedIn && isLoggedIn && activeInput) {
+      const platform = detectPlatform();
+      const text = getInputText(activeInput);
+      if (text.trim().length >= 5) {
+        onInputChange(activeInput, platform);
+      }
+    }
+
+    // User just signed out — swap suggestion pills back to the login CTA pill.
+    if (wasLoggedIn && !isLoggedIn && activeInput) {
+      const platform = detectPlatform();
+      const text = getInputText(activeInput);
+      if (text.trim().length >= 5 && contentSettings.pillsEnabled) {
+        renderLoginPrompt(activeInput, platform ?? undefined);
+      } else {
+        hideFeedback(true);
+      }
+    }
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Score blending — interpolates heuristic toward the last AI score based on
@@ -204,6 +245,16 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
     }
     safeSendMessage({ type: 'SCORE_UPDATE', score: displayScore });
 
+    // Show login CTA pill for unauthenticated users — skip AI scoring path.
+    if (!isLoggedIn && contentSettings.pillsEnabled) {
+      renderLoginPrompt(el, platform ?? undefined);
+      if (pulseTimer) {
+        clearTimeout(pulseTimer);
+        pulseTimer = null;
+      }
+      return;
+    }
+
     // Bump generation counter after the heuristic fires
     const gen = ++currentAIGen;
 
@@ -243,7 +294,11 @@ async function scheduleAIScore(
 
   if (!aiScore) {
     if (contentSettings.pillsEnabled) {
-      renderFeedback(heuristicScore.suggestions, heuristicScore, el, platform ?? undefined);
+      if (!isLoggedIn) {
+        renderLoginPrompt(el, platform ?? undefined);
+      } else {
+        renderFeedback(heuristicScore.suggestions, heuristicScore, el, platform ?? undefined);
+      }
     }
     return;
   }
