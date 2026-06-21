@@ -87,15 +87,71 @@ interface StoredSession {
   access_token: string;
   refresh_token: string;
   email: string;
+  expires_at?: number; // unix seconds — when the access_token expires
 }
 
-async function getAccessToken(): Promise<string | null> {
+async function getStoredSession(): Promise<StoredSession | null> {
   return new Promise((resolve) => {
     chrome.storage.local.get('mentro_session', (result) => {
-      const session = result['mentro_session'] as StoredSession | undefined;
-      resolve(session?.access_token ?? null);
+      resolve((result['mentro_session'] as StoredSession | undefined) ?? null);
     });
   });
+}
+
+/** True if the access token expires within the next 5 minutes (or is already expired). */
+function isTokenExpiringSoonBg(session: StoredSession): boolean {
+  const exp = session.expires_at ?? jwtExpBg(session.access_token);
+  if (exp == null) return false; // can't tell — assume OK
+  return Date.now() / 1000 > exp - 300; // 5-minute buffer
+}
+
+/**
+ * Exchange a refresh_token for a new access_token.
+ * Persists the updated session to storage and returns it, or null on failure.
+ */
+async function refreshStoredSession(session: StoredSession): Promise<StoredSession | null> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      access_token?: string;
+      refresh_token?: string;
+      expires_at?: number;
+      user?: { email?: string };
+    };
+    if (!data.access_token) return null;
+    const updated: StoredSession = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token ?? session.refresh_token,
+      email: data.user?.email ?? session.email,
+      expires_at: data.expires_at ?? jwtExpBg(data.access_token) ?? undefined,
+    };
+    await new Promise<void>((resolve) => {
+      chrome.storage.local.set({ mentro_session: updated }, resolve);
+    });
+    return updated;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load the stored session and proactively refresh the access token if it is
+ * expiring soon. Returns a valid access token, or null if not signed in.
+ */
+async function getValidAccessToken(): Promise<string | null> {
+  const session = await getStoredSession();
+  if (!session) return null;
+  if (isTokenExpiringSoonBg(session)) {
+    const refreshed = await refreshStoredSession(session);
+    return refreshed?.access_token ?? session.access_token;
+  }
+  return session.access_token;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +264,7 @@ async function fetchAIScore(
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const accessToken = await getAccessToken();
+    let accessToken = await getValidAccessToken();
     if (!accessToken) return null;
 
     const preAnalysis = heuristic ? buildPreAnalysis(heuristic) : '';
@@ -219,7 +275,7 @@ async function fetchAIScore(
       { role: 'user', content: userContent },
     ];
 
-    const res = await fetch(SCORE_URL, {
+    let res = await fetch(SCORE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -228,6 +284,36 @@ async function fetchAIScore(
       signal: controller.signal,
       body: JSON.stringify({ messages }),
     });
+
+    // Option B — retry once on 401: the proactive refresh may have been skipped
+    // (e.g. token looked valid but was revoked), so attempt one forced refresh.
+    if (res.status === 401) {
+      console.warn('[score] Got 401 — attempting token refresh and retrying.');
+      const session = await getStoredSession();
+      if (session) {
+        const refreshed = await refreshStoredSession(session);
+        if (refreshed) {
+          accessToken = refreshed.access_token;
+          // Use a fresh controller so the retry gets its own full timeout budget
+          // rather than inheriting whatever time remains on the original one.
+          const retryController = new AbortController();
+          const retryTimer = setTimeout(() => retryController.abort(), TIMEOUT_MS);
+          try {
+            res = await fetch(SCORE_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`,
+              },
+              signal: retryController.signal,
+              body: JSON.stringify({ messages }),
+            });
+          } finally {
+            clearTimeout(retryTimer);
+          }
+        }
+      }
+    }
 
     if (!res.ok) {
       if (res.status === 429) {

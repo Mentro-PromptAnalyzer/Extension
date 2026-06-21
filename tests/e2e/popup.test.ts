@@ -26,7 +26,14 @@ test.describe('Popup smoke tests', () => {
   test('React root mounts — #root has child nodes', async ({ context, extensionId }) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
-    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for React to mount — #root must have at least one child element.
+    // waitForFunction polls the DOM, avoiding the race condition that occurs
+    // when checking immediately after domcontentloaded.
+    await page.waitForFunction(() => {
+      const root = document.getElementById('root');
+      return root !== null && root.childElementCount > 0;
+    });
 
     const childCount = await page.$eval('#root', (el) => el.childElementCount);
     expect(childCount, '#root should have at least one child after React mounts').toBeGreaterThan(0);

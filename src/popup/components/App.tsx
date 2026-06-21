@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TipsTab } from './TipsTab';
 import { SettingsTab } from './SettingsTab';
 import { AccountTab } from './AccountTab';
-import { AuthSession, loadSession, getValidSession } from '../auth';
+import { AuthSession, getValidSession } from '../auth';
 import { Settings, loadSettings, DEFAULT_SETTINGS } from '../settings';
 
 type Tab = 'tips' | 'settings' | 'account';
@@ -93,29 +93,19 @@ export function App() {
   const platform = usePlatform();
 
   useEffect(() => {
+    // Resolve with defaults after 3 s so the UI never stays blank indefinitely
+    // (e.g. in E2E environments where Chrome storage resolves slowly).
+    const timeout = setTimeout(() => setReady(true), 3000);
+
     Promise.all([getValidSession(), loadSettings()]).then(([s, st]) => {
+      clearTimeout(timeout);
       setSession(s);
       setSettings(st);
       setReady(true);
     });
+
+    return () => clearTimeout(timeout);
   }, []);
-
-  if (!ready) return null;
-
-  // Logged-out: show only the sign-in form, no tab bar
-  if (!session) {
-    return (
-      <>
-        <div className="header">
-          <h1>Mentro</h1>
-          <PlatformBadge platform={platform} />
-        </div>
-        <div className="tab-panel active">
-          <AccountTab session={null} onSessionChange={setSession} />
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
@@ -136,15 +126,21 @@ export function App() {
         ))}
       </div>
 
-      <div className={`tab-panel${activeTab === 'tips' ? ' active' : ''}`}>
-        <TipsTab />
-      </div>
-      <div className={`tab-panel${activeTab === 'settings' ? ' active' : ''}`}>
-        <SettingsTab settings={settings} onSettingsChange={setSettings} />
-      </div>
-      <div className={`tab-panel${activeTab === 'account' ? ' active' : ''}`}>
-        <AccountTab session={session} onSessionChange={setSession} />
-      </div>
+      {ready ? (
+        <>
+          <div className={`tab-panel${activeTab === 'account' ? ' active' : ''}`}>
+            <AccountTab session={session} onSessionChange={setSession} />
+          </div>
+          <div className={`tab-panel${activeTab === 'tips' ? ' active' : ''}`}>
+            <TipsTab />
+          </div>
+          <div className={`tab-panel${activeTab === 'settings' ? ' active' : ''}`}>
+            <SettingsTab settings={settings} onSettingsChange={setSettings} />
+          </div>
+        </>
+      ) : (
+        <div className="tab-panel active" />
+      )}
     </>
   );
 }
