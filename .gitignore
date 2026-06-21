@@ -33,3 +33,6 @@ npm-debug.log*
 
 # Test coverage reports
 coverage/
+
+# CWS submission zip
+*.zip
