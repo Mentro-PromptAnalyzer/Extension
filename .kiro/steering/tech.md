@@ -61,6 +61,7 @@ All dependencies are `devDependencies` — nothing ships at runtime except the c
 | `vite` | Build tool |
 | `typescript` | Compiler |
 | `@types/chrome` | Chrome API types |
+| `@types/node` | Node.js types (used in build tooling / test config) |
 | `prettier` | Code formatter (3.5.3 pinned) — config in `.prettierrc`, ignores in `.prettierignore` |
 | `@vitejs/plugin-react` | JSX transform for React (4.4.1 pinned) |
 | `@types/react` | React types |
