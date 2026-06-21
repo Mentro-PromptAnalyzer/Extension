@@ -819,9 +819,12 @@ function showPendingPills(): void {
     document.body.appendChild(pill);
   });
 
-  // Transparent bridge covering the gaps between pills and the input bar
+  // Transparent bridge covering the gaps between pills and the input bar.
+  // Starts 36px above topPillTop (same as showLoginPill) so diagonal mouse
+  // paths through the pill body itself also stay within the pointer-events zone.
   const pillCount = pendingSuggestions.slice(0, 3).length;
   const topPillTop = rect.top - 44 - (pillCount - 1) * 40 + pillNudgeY;
+  const bridgeTop = topPillTop - 36;
   const bridgeWidth = Math.min(rect.width - 24, 520) + 24;
 
   const bridge = document.createElement('div');
@@ -829,9 +832,9 @@ function showPendingPills(): void {
   bridge.style.cssText = `
     position: fixed;
     left: ${rect.left}px;
-    top: ${topPillTop}px;
+    top: ${bridgeTop}px;
     width: ${bridgeWidth}px;
-    height: ${rect.top - topPillTop}px;
+    height: ${rect.top - bridgeTop}px;
     z-index: ${BADGE_Z + 5};
     pointer-events: auto;
     background: transparent;
