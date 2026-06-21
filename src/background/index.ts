@@ -294,15 +294,23 @@ async function fetchAIScore(
         const refreshed = await refreshStoredSession(session);
         if (refreshed) {
           accessToken = refreshed.access_token;
-          res = await fetch(SCORE_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${accessToken}`,
-            },
-            signal: controller.signal,
-            body: JSON.stringify({ messages }),
-          });
+          // Use a fresh controller so the retry gets its own full timeout budget
+          // rather than inheriting whatever time remains on the original one.
+          const retryController = new AbortController();
+          const retryTimer = setTimeout(() => retryController.abort(), TIMEOUT_MS);
+          try {
+            res = await fetch(SCORE_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`,
+              },
+              signal: retryController.signal,
+              body: JSON.stringify({ messages }),
+            });
+          } finally {
+            clearTimeout(retryTimer);
+          }
         }
       }
     }
