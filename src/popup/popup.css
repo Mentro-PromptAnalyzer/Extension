@@ -304,22 +304,6 @@ body {
   flex-direction: column;
   gap: 8px;
 }
-.auth-upsell {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 8px 10px;
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.08) 0%, rgba(167, 139, 250, 0.03) 100%);
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  border-top: 1px solid rgba(167, 139, 250, 0.28);
-  border-radius: 10px;
-  margin-bottom: 2px;
-}
-.auth-upsell span {
-  font-size: 10px;
-  color: rgba(167, 139, 250, 0.75);
-  line-height: 1.5;
-}
 .auth-field {
   display: flex;
   flex-direction: column;

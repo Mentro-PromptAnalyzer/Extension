@@ -102,6 +102,21 @@ export function App() {
 
   if (!ready) return null;
 
+  // Logged-out: show only the sign-in form, no tab bar
+  if (!session) {
+    return (
+      <>
+        <div className="header">
+          <h1>Mentro</h1>
+          <PlatformBadge platform={platform} />
+        </div>
+        <div className="tab-panel active">
+          <AccountTab session={null} onSessionChange={setSession} />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="header">

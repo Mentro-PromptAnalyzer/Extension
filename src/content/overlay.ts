@@ -47,6 +47,9 @@ let pendingScores: Pick<LiveScore, 'ownership' | 'depth' | 'critical' | 'clarity
 let pendingInputEl: HTMLElement | null = null;
 let pendingPlatform: PlatformConfig | undefined;
 
+// When true, the next hover shows a login CTA pill instead of suggestion pills
+let pendingLoginPrompt = false;
+
 // Input bar hover listeners — kept so we can remove them on re-attach
 let inputBarHoverEl: HTMLElement | null = null;
 let inputBarEnterListener: (() => void) | null = null;
@@ -686,7 +689,116 @@ function createPillElement(
   return pill;
 }
 
+/**
+ * Show the single login CTA pill.
+ * Uses brand purple styling — not the red/green scoring colours.
+ */
+function showLoginPill(rect: DOMRect, nudgeY = 0): void {
+  const color = 'rgba(167, 139, 250, 1)';
+  const borderColor = 'rgba(167, 139, 250, 0.35)';
+  const glowColor = 'rgba(167, 139, 250, 0.18)';
+
+  const pill = document.createElement('div');
+  pill.className = FEEDBACK_CLASS;
+  pill.style.cssText = `
+    position: fixed;
+    left: ${rect.left + 12}px;
+    top: ${rect.top - 44 + nudgeY}px;
+    max-width: ${Math.min(rect.width - 24, 520)}px;
+    background: linear-gradient(135deg, rgba(167,139,250,0.12) 0%, rgba(167,139,250,0.04) 100%);
+    border: 1px solid ${borderColor};
+    border-top: 1px solid rgba(167,139,250,0.45);
+    border-radius: 20px;
+    padding: 7px 14px 7px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: ${color};
+    box-shadow: 0 0 20px 3px ${glowColor}, 0 0 8px 1px rgba(167,139,250,0.10), 0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(167,139,250,0.18);
+    z-index: ${BADGE_Z + 10};
+    pointer-events: auto;
+    animation: mentro-fly-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    cursor: default;
+    white-space: nowrap;
+    overflow: hidden;
+  `;
+
+  const icon = document.createElement('span');
+  icon.textContent = '💜';
+  icon.style.cssText = 'flex-shrink: 0; font-size: 13px; line-height: 1;';
+
+  const label = document.createElement('span');
+  label.className = 'mentro-pill-label';
+  label.textContent = 'Sign in to Mentro for personalised improvement tips';
+
+  pill.appendChild(icon);
+  pill.appendChild(label);
+
+  pill.addEventListener('mouseleave', (e: MouseEvent) => {
+    const rel = e.relatedTarget as HTMLElement | null;
+    if (
+      (rel && (inputBarHoverEl?.contains(rel) || rel === inputBarHoverEl)) ||
+      rel?.closest(`.${FEEDBACK_CLASS}`) ||
+      rel?.id === FEEDBACK_BRIDGE_ID
+    )
+      return;
+    mouseInsideInputBar = false;
+    hideFeedback();
+  });
+
+  document.body.appendChild(pill);
+
+  // Bridge: spans from just above the pill top down to the input bar top,
+  // filling the gap so diagonal mouse paths through the gap don't dismiss.
+  // Starts 36px above topPillTop to also back the pill itself.
+  const topPillTop = rect.top - 44 + nudgeY;
+  const bridgeTop = topPillTop - 36;
+  const bridgeWidth = Math.min(rect.width - 24, 520) + 24;
+
+  const bridge = document.createElement('div');
+  bridge.id = FEEDBACK_BRIDGE_ID;
+  bridge.style.cssText = `
+    position: fixed;
+    left: ${rect.left}px;
+    top: ${bridgeTop}px;
+    width: ${bridgeWidth}px;
+    height: ${rect.top - bridgeTop}px;
+    z-index: ${BADGE_Z + 5};
+    pointer-events: auto;
+    background: transparent;
+  `;
+  bridge.addEventListener('mouseleave', (e: MouseEvent) => {
+    const rel = e.relatedTarget as HTMLElement | null;
+    if (
+      (rel && (inputBarHoverEl?.contains(rel) || rel === inputBarHoverEl)) ||
+      rel?.closest(`.${FEEDBACK_CLASS}`)
+    )
+      return;
+    mouseInsideInputBar = false;
+    hideFeedback();
+  });
+  document.body.appendChild(bridge);
+
+  feedbackVisible = true;
+}
+
 function showPendingPills(): void {
+  // Login prompt takes priority over suggestion pills
+  if (pendingLoginPrompt && pendingInputEl) {
+    injectFeedbackStyles();
+    document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`).forEach((p) => p.remove());
+    document.getElementById(FEEDBACK_BRIDGE_ID)?.remove();
+    const inputBar = inputBarHoverEl ?? findInputBar(pendingInputEl, pendingPlatform);
+    const rect = inputBar.getBoundingClientRect();
+    showLoginPill(rect, pendingPlatform?.pillNudgeY ?? 0);
+    return;
+  }
+
   if (!pendingScores || pendingSuggestions.length === 0 || !pendingInputEl) return;
 
   injectFeedbackStyles();
@@ -810,8 +922,29 @@ export function renderFeedback(
   pendingScores = scores;
   pendingInputEl = inputEl;
   pendingPlatform = platform;
+  pendingLoginPrompt = false;
   if (feedbackVisible) {
     document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`).forEach((p) => p.remove());
+    feedbackVisible = false;
+  }
+  if (mouseInsideInputBar) {
+    showPendingPills();
+  }
+}
+
+/**
+ * Queue a login CTA pill for the next input bar hover.
+ * Shown when the user is not signed in — replaces suggestion pills.
+ */
+export function renderLoginPrompt(inputEl: HTMLElement, platform?: PlatformConfig): void {
+  pendingLoginPrompt = true;
+  pendingSuggestions = [];
+  pendingScores = null;
+  pendingInputEl = inputEl;
+  pendingPlatform = platform;
+  if (feedbackVisible) {
+    document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`).forEach((p) => p.remove());
+    document.getElementById(FEEDBACK_BRIDGE_ID)?.remove();
     feedbackVisible = false;
   }
   if (mouseInsideInputBar) {
@@ -829,6 +962,7 @@ export function hideFeedback(instant = false): void {
     pendingSuggestions = [];
     pendingScores = null;
     pendingInputEl = null;
+    pendingLoginPrompt = false;
   }
 
   const pills = document.querySelectorAll<HTMLElement>(`.${FEEDBACK_CLASS}`);
