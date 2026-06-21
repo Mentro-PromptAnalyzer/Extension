@@ -97,12 +97,18 @@ export function App() {
     // (e.g. in E2E environments where Chrome storage resolves slowly).
     const timeout = setTimeout(() => setReady(true), 3000);
 
-    Promise.all([getValidSession(), loadSettings()]).then(([s, st]) => {
-      clearTimeout(timeout);
-      setSession(s);
-      setSettings(st);
-      setReady(true);
-    });
+    Promise.all([getValidSession(), loadSettings()])
+      .then(([s, st]) => {
+        clearTimeout(timeout);
+        setSession(s);
+        setSettings(st);
+        setReady(true);
+      })
+      .catch((err: unknown) => {
+        console.error('[popup] init failed:', err instanceof Error ? err.message : err);
+        clearTimeout(timeout);
+        setReady(true);
+      });
 
     return () => clearTimeout(timeout);
   }, []);
