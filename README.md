@@ -47,10 +47,3 @@ Then load the extension in Chrome:
 2. Enable "Developer mode"
 3. Click "Load unpacked"
 4. Select the `extension/` directory
-
-## TODO
-
-- [ ] Port full scoring logic from `mentro/src/analysis/`
-- [ ] Track submitted prompts and sync to dashboard
-- [ ] Handle platform DOM changes (selectors may need updating)
-- [ ] Publish to Chrome Web Store
