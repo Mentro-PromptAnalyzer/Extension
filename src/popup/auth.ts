@@ -163,118 +163,116 @@ export async function signOut(accessToken: string): Promise<void> {
 // Lifetime stats — fetched from Supabase REST using the user's access token
 // ---------------------------------------------------------------------------
 
-export interface SessionRow {
-  overall_score: number;
-  prompt_count: number;
+interface ExtensionPromptRow {
+  word_count: number;
+  score_overall: number;
+  intent: string;
   platform: string;
-  title: string;
   created_at: string;
-  analysis_result: {
-    prompts?: Array<{ wordCount?: number }>;
-  } | null;
-}
-
-export interface WordCountBuckets {
-  short: number; // 1–15 words
-  medium: number; // 16–50 words
-  long: number; // 51+ words
-  total: number;
 }
 
 export interface LifetimeStats {
   totalPrompts: number;
   avgScore: number | null;
-  totalSessions: number;
   topPlatform: string | null;
-  // Raw data for detail views
-  sessions: SessionRow[];
-  platformCounts: Record<string, number>;
-  platformAvgScores: Record<string, number>;
-  wordCountBuckets: WordCountBuckets;
+  wordCountBuckets: {
+    short: number; // word_count 1–15
+    medium: number; // word_count 16–50
+    long: number; // word_count 51+
+    total: number;
+  };
+  scoreBands: {
+    excellent: number; // score_overall 71–100
+    good: number; // score_overall 41–70
+    needsWork: number; // score_overall 0–40
+  };
+  intentCounts: Record<'delegation' | 'curiosity' | 'collaborative' | 'verification', number>;
+  platformStats: Record<string, { count: number; avgScore: number }>;
 }
 
-export async function fetchLifetimeStats(accessToken: string): Promise<LifetimeStats> {
-  const headers = {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-  };
+export function aggregateStats(rows: ExtensionPromptRow[]): LifetimeStats {
+  const totalPrompts = rows.length;
 
-  const [histRes, analysisRes] = await Promise.all([
-    fetch(
-      `${SUPABASE_URL}/rest/v1/chat_histories?select=overall_score,prompt_count,platform,title,created_at,analysis_result&order=created_at.desc`,
-      { headers }
-    ),
-    fetch(`${SUPABASE_URL}/rest/v1/analysis_history?select=prompt_count`, { headers }),
-  ]);
-
-  type AnalysisRow = { prompt_count: number };
-
-  const sessions: SessionRow[] = histRes.ok ? ((await histRes.json()) as SessionRow[]) : [];
-  const analysisRows: AnalysisRow[] = analysisRes.ok
-    ? ((await analysisRes.json()) as AnalysisRow[])
-    : [];
-
-  const totalSessions = sessions.length;
-
-  const totalPrompts =
-    analysisRows.length > 0
-      ? analysisRows.reduce((sum, r) => sum + (r.prompt_count ?? 0), 0)
-      : sessions.reduce((sum, r) => sum + (r.prompt_count ?? 0), 0);
-
-  const scoredRows = sessions.filter((r) => r.overall_score > 0);
   const avgScore =
-    scoredRows.length > 0
-      ? Math.round(scoredRows.reduce((sum, r) => sum + r.overall_score, 0) / scoredRows.length)
-      : null;
+    totalPrompts === 0
+      ? null
+      : Math.round(rows.reduce((s, r) => s + r.score_overall, 0) / totalPrompts);
 
-  const platformCounts: Record<string, number> = {};
-  const platformScoreSums: Record<string, number> = {};
-  const platformScoreCounts: Record<string, number> = {};
-
-  for (const r of sessions) {
-    if (r.platform && r.platform !== 'unknown') {
-      platformCounts[r.platform] = (platformCounts[r.platform] ?? 0) + 1;
-      if (r.overall_score > 0) {
-        platformScoreSums[r.platform] = (platformScoreSums[r.platform] ?? 0) + r.overall_score;
-        platformScoreCounts[r.platform] = (platformScoreCounts[r.platform] ?? 0) + 1;
-      }
-    }
+  const wordCountBuckets = { short: 0, medium: 0, long: 0, total: totalPrompts };
+  for (const r of rows) {
+    if (r.word_count <= 15) wordCountBuckets.short++;
+    else if (r.word_count <= 50) wordCountBuckets.medium++;
+    else wordCountBuckets.long++;
   }
 
-  const platformAvgScores: Record<string, number> = {};
-  for (const p of Object.keys(platformScoreSums)) {
-    platformAvgScores[p] = Math.round(platformScoreSums[p] / platformScoreCounts[p]);
+  const scoreBands = { excellent: 0, good: 0, needsWork: 0 };
+  for (const r of rows) {
+    if (r.score_overall >= 71) scoreBands.excellent++;
+    else if (r.score_overall >= 41) scoreBands.good++;
+    else scoreBands.needsWork++;
+  }
+
+  const intentCounts: LifetimeStats['intentCounts'] = {
+    delegation: 0,
+    curiosity: 0,
+    collaborative: 0,
+    verification: 0,
+  };
+  for (const r of rows) {
+    const k = r.intent as keyof typeof intentCounts;
+    if (k in intentCounts) intentCounts[k]++;
+  }
+
+  const platformMap: Record<string, { sum: number; count: number }> = Object.create(null);
+  for (const r of rows) {
+    if (!Object.prototype.hasOwnProperty.call(platformMap, r.platform)) {
+      platformMap[r.platform] = { sum: 0, count: 0 };
+    }
+    platformMap[r.platform].sum += r.score_overall;
+    platformMap[r.platform].count++;
+  }
+  const platformStats: LifetimeStats['platformStats'] = Object.create(null);
+  for (const [p, { sum, count }] of Object.entries(platformMap)) {
+    platformStats[p] = { count, avgScore: Math.round(sum / count) };
   }
 
   const topPlatform =
-    Object.keys(platformCounts).length > 0
-      ? Object.entries(platformCounts).sort((a, b) => b[1] - a[1])[0][0]
-      : null;
-
-  // Word count distribution — extracted from analysis_result.prompts[].wordCount
-  const wordCountBuckets: WordCountBuckets = { short: 0, medium: 0, long: 0, total: 0 };
-  for (const s of sessions) {
-    const prompts = s.analysis_result?.prompts ?? [];
-    for (const p of prompts) {
-      const wc = p.wordCount ?? 0;
-      wordCountBuckets.total++;
-      if (wc <= 15) wordCountBuckets.short++;
-      else if (wc <= 50) wordCountBuckets.medium++;
-      else wordCountBuckets.long++;
-    }
-  }
+    totalPrompts === 0
+      ? null
+      : Object.entries(platformStats).sort((a, b) => b[1].count - a[1].count)[0][0];
 
   return {
     totalPrompts,
     avgScore,
-    totalSessions,
     topPlatform,
-    sessions,
-    platformCounts,
-    platformAvgScores,
     wordCountBuckets,
+    scoreBands,
+    intentCounts,
+    platformStats,
   };
+}
+
+export async function fetchLifetimeStats(
+  accessToken: string
+): Promise<{ ok: true; stats: LifetimeStats } | { ok: false }> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/extension_prompts` +
+        `?select=word_count,score_overall,score_ownership,score_depth,score_critical,score_clarity,intent,platform,created_at` +
+        `&order=created_at.desc`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+    if (!res.ok) return { ok: false };
+    const rows = (await res.json()) as ExtensionPromptRow[];
+    return { ok: true, stats: aggregateStats(rows) };
+  } catch {
+    return { ok: false };
+  }
 }
 
 export async function signInWithOAuth(
@@ -290,4 +288,53 @@ export async function signInWithOAuth(
       resolve(response as { session: AuthSession } | { error: string });
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Data deletion
+// ---------------------------------------------------------------------------
+
+/**
+ * Delete all extension_prompts rows for the current user.
+ * RLS ensures only the authenticated user's own rows are deleted.
+ */
+export async function deleteAllPrompts(
+  accessToken: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    // RLS scopes the DELETE to the authenticated user's own rows.
+    // The user_id filter is redundant but acts as a safety net — Supabase
+    // requires at least one filter on DELETE to prevent accidental full-table wipes.
+    const userId = getUserIdFromToken(accessToken);
+    if (!userId) return { ok: false, error: 'Could not read user ID from token.' };
+
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/extension_prompts?user_id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          Prefer: 'return=minimal',
+        },
+      }
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      return { ok: false, error: `Server returned ${res.status}${body ? `: ${body}` : ''}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+  }
+}
+
+/** Extract the user UUID from a JWT sub claim without signature verification. */
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return (payload as { sub?: string }).sub ?? null;
+  } catch {
+    return null;
+  }
 }

@@ -8,12 +8,14 @@ import {
   fetchLifetimeStats,
   getValidSession,
   LifetimeStats,
-  WordCountBuckets,
 } from '../auth';
 
 interface Props {
   session: AuthSession | null;
   onSessionChange: (s: AuthSession | null) => void;
+  statsEnabled: boolean;
+  isActive: boolean;
+  reloadKey: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +74,28 @@ function scoreColor(score: number): string {
 // Detail panels
 // ---------------------------------------------------------------------------
 
-type DetailKey = 'prompts' | 'score' | 'sessions' | 'platform';
+type DetailKey = 'prompts' | 'score' | 'intents' | 'platform';
+
+const INTENT_TIEBREAK: Array<'delegation' | 'curiosity' | 'collaborative' | 'verification'> = [
+  'delegation',
+  'curiosity',
+  'collaborative',
+  'verification',
+];
+
+export function computeTopIntent(
+  counts: LifetimeStats['intentCounts']
+): (typeof INTENT_TIEBREAK)[number] {
+  let best: (typeof INTENT_TIEBREAK)[number] = 'delegation';
+  let bestCount = -1;
+  for (const intent of INTENT_TIEBREAK) {
+    if (counts[intent] > bestCount) {
+      bestCount = counts[intent];
+      best = intent;
+    }
+  }
+  return best;
+}
 
 function PromptsDetail({ stats }: { stats: LifetimeStats }) {
   const { wordCountBuckets: b } = stats;
@@ -106,31 +129,53 @@ function PromptsDetail({ stats }: { stats: LifetimeStats }) {
           </div>
         );
       })}
-      <div className="wc-footer">
-        {b.total} prompt{b.total !== 1 ? 's' : ''} across all sessions
-      </div>
+      <div className="wc-footer">{b.total} prompts total</div>
     </div>
   );
 }
 
 function ScoreDetail({ stats }: { stats: LifetimeStats }) {
-  const scored = stats.sessions.filter((s) => s.overall_score > 0);
+  const { scoreBands, totalPrompts } = stats;
+  if (totalPrompts === 0) return <div className="detail-empty">No scored prompts yet.</div>;
   const bands = [
-    { label: 'Excellent (71–100)', min: 71, max: 100 },
-    { label: 'Good (41–70)', min: 41, max: 70 },
-    { label: 'Needs work (0–40)', min: 0, max: 40 },
+    { label: 'Excellent (71–100)', count: scoreBands.excellent },
+    { label: 'Good (41–70)', count: scoreBands.good },
+    { label: 'Needs work (0–40)', count: scoreBands.needsWork },
   ];
   return (
     <div className="detail-list">
-      {scored.length === 0 && <div className="detail-empty">No scored sessions yet.</div>}
       {bands.map((b) => {
-        const count = scored.filter(
-          (s) => s.overall_score >= b.min && s.overall_score <= b.max
-        ).length;
-        const pct = scored.length > 0 ? Math.round((count / scored.length) * 100) : 0;
+        const pct = Math.round((b.count / totalPrompts) * 100);
         return (
           <div key={b.label} className="detail-row">
             <span className="detail-row-label">{b.label}</span>
+            <span className="detail-row-value">
+              {b.count} <span className="detail-row-sub">({pct}%)</span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function IntentsDetail({ stats }: { stats: LifetimeStats }) {
+  const { intentCounts } = stats;
+  const total = Object.values(intentCounts).reduce((s, c) => s + c, 0);
+  if (total === 0) return <div className="detail-empty">No intent data yet.</div>;
+
+  const sorted = (Object.entries(intentCounts) as Array<[keyof typeof intentCounts, number]>).sort(
+    (a, b) => b[1] - a[1]
+  );
+
+  return (
+    <div className="detail-list">
+      {sorted.map(([intent, count]) => {
+        const pct = Math.round((count / total) * 100);
+        const label = intent.charAt(0).toUpperCase() + intent.slice(1);
+        return (
+          <div key={intent} className="detail-row">
+            <span className="detail-row-label">{label}</span>
             <span className="detail-row-value">
               {count} <span className="detail-row-sub">({pct}%)</span>
             </span>
@@ -141,54 +186,23 @@ function ScoreDetail({ stats }: { stats: LifetimeStats }) {
   );
 }
 
-function SessionsDetail({ stats }: { stats: LifetimeStats }) {
-  const byPlatform = Object.entries(stats.platformCounts).sort((a, b) => b[1] - a[1]);
-  const unknown = stats.sessions.filter((s) => !s.platform || s.platform === 'unknown').length;
+function PlatformDetail({ stats }: { stats: LifetimeStats }) {
+  const entries = Object.entries(stats.platformStats).sort((a, b) => b[1].count - a[1].count);
+  if (entries.length === 0) return <div className="detail-empty">No platform data yet.</div>;
   return (
     <div className="detail-list">
-      {byPlatform.length === 0 && <div className="detail-empty">No platform data yet.</div>}
-      {byPlatform.map(([p, count]) => (
+      {entries.map(([p, { count, avgScore }]) => (
         <div key={p} className="detail-row">
           <span className="detail-row-label">{platformLabel(p)}</span>
           <span className="detail-row-value">
-            {count} session{count !== 1 ? 's' : ''}
+            {count} prompt{count !== 1 ? 's' : ''}
+            <span className="detail-row-sub" style={{ color: scoreColor(avgScore) }}>
+              {' · '}
+              {avgScore} avg
+            </span>
           </span>
         </div>
       ))}
-      {unknown > 0 && (
-        <div className="detail-row">
-          <span className="detail-row-label">Unknown</span>
-          <span className="detail-row-value">
-            {unknown} session{unknown !== 1 ? 's' : ''}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PlatformDetail({ stats }: { stats: LifetimeStats }) {
-  const platforms = Object.entries(stats.platformCounts).sort((a, b) => b[1] - a[1]);
-  return (
-    <div className="detail-list">
-      {platforms.length === 0 && <div className="detail-empty">No platform data yet.</div>}
-      {platforms.map(([p, count]) => {
-        const avg = stats.platformAvgScores[p];
-        return (
-          <div key={p} className="detail-row">
-            <span className="detail-row-label">{platformLabel(p)}</span>
-            <span className="detail-row-value">
-              {count} session{count !== 1 ? 's' : ''}
-              {avg != null && (
-                <span className="detail-row-sub" style={{ color: scoreColor(avg) }}>
-                  {' '}
-                  · {avg} avg
-                </span>
-              )}
-            </span>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -238,19 +252,32 @@ function SignedInView({
   session,
   stats,
   statsLoading,
+  statsError,
+  statsEnabled,
+  isActive,
   onSignOut,
+  onReload,
 }: {
   session: AuthSession;
   stats: LifetimeStats | null;
   statsLoading: boolean;
+  statsError: boolean;
+  statsEnabled: boolean;
+  isActive: boolean;
   onSignOut: () => void;
+  onReload: () => void;
 }) {
   const [detail, setDetail] = useState<DetailKey | null>(null);
+
+  // Reset detail panel when the user switches away from the Account tab
+  useEffect(() => {
+    if (!isActive) setDetail(null);
+  }, [isActive]);
 
   const detailTitles: Record<DetailKey, string> = {
     prompts: 'Prompts scored',
     score: 'Avg score',
-    sessions: 'Sessions',
+    intents: 'Top intent',
     platform: 'Top platform',
   };
 
@@ -263,7 +290,21 @@ function SignedInView({
 
       {statsLoading && <div className="stats-loading">Loading stats…</div>}
 
-      {!statsLoading && stats && !detail && (
+      {!statsEnabled && (
+        <div className="stats-paused-banner">
+          Stat collection is paused. Enable it in <strong>Settings</strong> to track your prompts.
+        </div>
+      )}
+
+      {!statsLoading && statsError && (
+        <div className="stats-error">
+          <button className="stats-reload-btn" onClick={onReload}>
+            Reload stats
+          </button>
+        </div>
+      )}
+
+      {!statsLoading && !statsError && stats && !detail && (
         <div className="stats-list">
           <StatRow
             label="Prompts scored"
@@ -276,9 +317,16 @@ function SignedInView({
             onClick={() => setDetail('score')}
           />
           <StatRow
-            label="Sessions"
-            value={stats.totalSessions > 0 ? stats.totalSessions.toString() : '—'}
-            onClick={() => setDetail('sessions')}
+            label="Top intent"
+            value={
+              stats.totalPrompts === 0
+                ? '—'
+                : (() => {
+                    const k = computeTopIntent(stats.intentCounts);
+                    return k.charAt(0).toUpperCase() + k.slice(1);
+                  })()
+            }
+            onClick={() => setDetail('intents')}
           />
           <StatRow
             label="Top platform"
@@ -288,7 +336,7 @@ function SignedInView({
         </div>
       )}
 
-      {!statsLoading && stats && detail && (
+      {!statsLoading && !statsError && stats && detail && (
         <div className="detail-panel">
           <button className="detail-back" onClick={() => setDetail(null)}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -304,7 +352,7 @@ function SignedInView({
           </button>
           {detail === 'prompts' && <PromptsDetail stats={stats} />}
           {detail === 'score' && <ScoreDetail stats={stats} />}
-          {detail === 'sessions' && <SessionsDetail stats={stats} />}
+          {detail === 'intents' && <IntentsDetail stats={stats} />}
           {detail === 'platform' && <PlatformDetail stats={stats} />}
         </div>
       )}
@@ -320,7 +368,7 @@ function SignedInView({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AccountTab({ session, onSessionChange }: Props) {
+export function AccountTab({ session, onSessionChange, statsEnabled, isActive, reloadKey }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -328,30 +376,58 @@ export function AccountTab({ session, onSessionChange }: Props) {
   const [loadingOAuth, setLoadingOAuth] = useState<'google' | 'github' | null>(null);
   const [stats, setStats] = useState<LifetimeStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
   const anyLoading = loadingPassword || loadingOAuth !== null;
+
+  async function loadStats(token: string) {
+    setStatsLoading(true);
+    setStatsError(false);
+    const result = await fetchLifetimeStats(token);
+    if (result.ok) {
+      setStats(result.stats);
+    } else {
+      setStatsError(true);
+    }
+    setStatsLoading(false);
+  }
+
+  // Silent background refresh — no loading spinner, no error state change.
+  // Only updates stats if the fetch succeeds so a transient network hiccup
+  // doesn't wipe out the currently displayed data.
+  async function refreshStatsSilently(token: string) {
+    const result = await fetchLifetimeStats(token);
+    if (result.ok) setStats(result.stats);
+  }
 
   useEffect(() => {
     if (!session) {
       setStats(null);
       return;
     }
-    setStatsLoading(true);
-    // Refresh the token if it's expiring soon before hitting Supabase REST
+
+    let token: string | null = null;
+
+    // Initial load (with loading spinner + error state)
     getValidSession()
       .then((validSession) => {
         if (!validSession) return Promise.reject(new Error('no session'));
-        // Propagate the refreshed token back up if it changed
         if (validSession.access_token !== session.access_token) {
           onSessionChange(validSession);
         }
-        return fetchLifetimeStats(validSession.access_token);
+        token = validSession.access_token;
+        return loadStats(token);
       })
-      .then(setStats)
-      .catch(() => setStats(null))
-      .finally(() => setStatsLoading(false));
-  }, [session]);
+      .catch(() => setStatsError(true));
+
+    // Poll every 10 s while the popup is open
+    const interval = setInterval(() => {
+      if (token) void refreshStatsSilently(token);
+    }, 10_000);
+
+    return () => clearInterval(interval);
+  }, [session, reloadKey]);
 
   async function handlePasswordSignIn() {
     setError('');
@@ -400,7 +476,15 @@ export function AccountTab({ session, onSessionChange }: Props) {
         session={session}
         stats={stats}
         statsLoading={statsLoading}
+        statsError={statsError}
+        statsEnabled={statsEnabled}
+        isActive={isActive}
         onSignOut={handleSignOut}
+        onReload={() => {
+          getValidSession().then((validSession) => {
+            if (validSession) loadStats(validSession.access_token);
+          });
+        }}
       />
     );
   }

@@ -277,6 +277,56 @@ body {
   color: rgba(248, 113, 113, 0.9);
   box-shadow: 0 0 14px 1px rgba(248, 113, 113, 0.1);
 }
+
+.delete-data-btn {
+  width: 100%;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.07) 0%, rgba(248, 113, 113, 0.02) 100%);
+  border: 1px solid rgba(248, 113, 113, 0.18);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  color: rgba(248, 113, 113, 0.65);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s, background 0.15s;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: inherit;
+}
+.delete-data-btn:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.38);
+  color: rgba(248, 113, 113, 0.9);
+  box-shadow: 0 0 14px 1px rgba(248, 113, 113, 0.1);
+}
+.delete-data-btn.confirm {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.14) 0%, rgba(248, 113, 113, 0.06) 100%);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: rgba(248, 113, 113, 0.95);
+}
+.delete-data-btn.done {
+  border-color: rgba(74, 222, 128, 0.3);
+  color: rgba(74, 222, 128, 0.7);
+  cursor: default;
+}
+.delete-data-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.delete-data-hint {
+  font-size: 10px;
+  color: rgba(248, 113, 113, 0.6);
+  text-align: center;
+  margin-top: 4px;
+}
+.delete-data-error {
+  font-size: 10px;
+  color: rgba(248, 113, 113, 0.8);
+  text-align: center;
+  margin-top: 4px;
+}
 .saved-toast {
   font-size: 9px;
   font-weight: 700;
@@ -626,6 +676,45 @@ body {
   color: rgba(240, 238, 245, 0.3);
   text-align: center;
   padding: 8px 0;
+}
+
+.stats-paused-banner {
+  font-size: 11px;
+  color: rgba(240, 238, 245, 0.55);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 4px 0 8px;
+  line-height: 1.5;
+}
+
+.stats-paused-banner strong {
+  color: rgba(251, 191, 36, 0.85);
+  font-weight: 600;
+}
+
+.deleting-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 0;
+  font-size: 11px;
+  color: rgba(240, 238, 245, 0.45);
+}
+
+.deleting-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(248, 113, 113, 0.2);
+  border-top-color: rgba(248, 113, 113, 0.7);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Word count distribution ── */
