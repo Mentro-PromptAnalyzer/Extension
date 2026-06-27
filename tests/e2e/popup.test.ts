@@ -39,7 +39,7 @@ test.describe('Popup smoke tests', () => {
     expect(childCount, '#root should have at least one child after React mounts').toBeGreaterThan(0);
   });
 
-  test('tab bar renders with Account, Tips, and Settings tabs', async ({
+  test('tab bar renders only Account tab when signed out', async ({
     context,
     extensionId,
   }) => {
@@ -47,9 +47,12 @@ test.describe('Popup smoke tests', () => {
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForLoadState('domcontentloaded');
 
-    // The App component renders three tab buttons.
+    // When signed out, Tips and Settings tabs are hidden — only Account is shown.
     const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|tips|settings/i });
-    await expect(tabs).toHaveCount(3);
+    await expect(tabs).toHaveCount(1);
+
+    const accountTab = tabs.filter({ hasText: /account/i });
+    await expect(accountTab).toHaveCount(1);
   });
 
   test('Account tab is active by default', async ({ context, extensionId }) => {
@@ -65,8 +68,95 @@ test.describe('Popup smoke tests', () => {
     await expect(accountTab).toBeVisible();
   });
 
-  test('Tips tab renders tip cards when clicked', async ({ context, extensionId }) => {
+  test('Tips and Settings tabs appear when signed in', async ({ context, extensionId }) => {
     const page = await context.newPage();
+
+    // Seed a minimal fake session into chrome.storage.local so the popup
+    // treats the user as signed in and renders all three tabs.
+    const fakeSession = {
+      access_token: 'fake-access-token',
+      refresh_token: 'fake-refresh-token',
+      expires_at: Date.now() / 1000 + 3600, // expires 1 hour from now
+      user: { id: 'test-user-id', email: 'test@example.com' },
+    };
+
+    await context.addInitScript(
+      ({ session }) => {
+        // Override chrome.storage.local.get to return the fake session
+        // before the popup reads it on mount.
+        const origGet = chrome.storage.local.get.bind(chrome.storage.local);
+        chrome.storage.local.get = (keys: any, callback?: any) => {
+          if (typeof callback === 'function') {
+            origGet(keys, (result: Record<string, unknown>) => {
+              if (
+                keys === 'mentro_session' ||
+                (Array.isArray(keys) && keys.includes('mentro_session')) ||
+                (keys && typeof keys === 'object' && 'mentro_session' in keys)
+              ) {
+                callback({ ...result, mentro_session: session });
+              } else {
+                callback(result);
+              }
+            });
+          } else {
+            return origGet(keys);
+          }
+        };
+      },
+      { session: fakeSession },
+    );
+
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for React to mount and the session to be detected.
+    await page.waitForFunction(() => {
+      const root = document.getElementById('root');
+      return root !== null && root.childElementCount > 0;
+    });
+
+    // All three tabs should now be visible.
+    const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|tips|settings/i });
+    await expect(tabs).toHaveCount(3, { timeout: 5_000 });
+  });
+
+  test('Tips tab renders tip cards when signed in and clicked', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await context.newPage();
+
+    const fakeSession = {
+      access_token: 'fake-access-token',
+      refresh_token: 'fake-refresh-token',
+      expires_at: Date.now() / 1000 + 3600,
+      user: { id: 'test-user-id', email: 'test@example.com' },
+    };
+
+    await context.addInitScript(
+      ({ session }) => {
+        const origGet = chrome.storage.local.get.bind(chrome.storage.local);
+        chrome.storage.local.get = (keys: any, callback?: any) => {
+          if (typeof callback === 'function') {
+            origGet(keys, (result: Record<string, unknown>) => {
+              if (
+                keys === 'mentro_session' ||
+                (Array.isArray(keys) && keys.includes('mentro_session')) ||
+                (keys && typeof keys === 'object' && 'mentro_session' in keys)
+              ) {
+                callback({ ...result, mentro_session: session });
+              } else {
+                callback(result);
+              }
+            });
+          } else {
+            return origGet(keys);
+          }
+        };
+      },
+      { session: fakeSession },
+    );
+
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForLoadState('domcontentloaded');
 
@@ -81,8 +171,43 @@ test.describe('Popup smoke tests', () => {
     await expect(cards.first()).toBeVisible({ timeout: 3_000 });
   });
 
-  test('Settings tab renders toggles when clicked', async ({ context, extensionId }) => {
+  test('Settings tab renders toggles when signed in and clicked', async ({
+    context,
+    extensionId,
+  }) => {
     const page = await context.newPage();
+
+    const fakeSession = {
+      access_token: 'fake-access-token',
+      refresh_token: 'fake-refresh-token',
+      expires_at: Date.now() / 1000 + 3600,
+      user: { id: 'test-user-id', email: 'test@example.com' },
+    };
+
+    await context.addInitScript(
+      ({ session }) => {
+        const origGet = chrome.storage.local.get.bind(chrome.storage.local);
+        chrome.storage.local.get = (keys: any, callback?: any) => {
+          if (typeof callback === 'function') {
+            origGet(keys, (result: Record<string, unknown>) => {
+              if (
+                keys === 'mentro_session' ||
+                (Array.isArray(keys) && keys.includes('mentro_session')) ||
+                (keys && typeof keys === 'object' && 'mentro_session' in keys)
+              ) {
+                callback({ ...result, mentro_session: session });
+              } else {
+                callback(result);
+              }
+            });
+          } else {
+            return origGet(keys);
+          }
+        };
+      },
+      { session: fakeSession },
+    );
+
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForLoadState('domcontentloaded');
 
