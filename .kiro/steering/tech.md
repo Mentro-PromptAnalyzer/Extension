@@ -69,6 +69,7 @@ All dependencies are `devDependencies` — nothing ships at runtime except the c
 | `@playwright/test` | E2E test framework |
 | `@vitest/coverage-v8` | Coverage reporter for Vitest |
 | `vitest` | Unit test runner |
+| `fast-check` | Property-based testing library (3.23.2 pinned) — used in analysis unit tests |
 
 Runtime dependencies (ship in `dist/popup.js`):
 
