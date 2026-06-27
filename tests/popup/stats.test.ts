@@ -316,6 +316,9 @@ describe('Property-based tests', () => {
         } else {
           expect(topPlatform).not.toBeNull();
           expect(platformStats[topPlatform!]).toBeDefined();
+          // The chosen platform must have the maximum count across all platforms
+          const maxCount = Math.max(...Object.values(platformStats).map((s) => s.count));
+          expect(platformStats[topPlatform!].count).toBe(maxCount);
         }
       }),
       { numRuns: 100 }

@@ -13,8 +13,7 @@
     "https://www.perplexity.ai/*",
     "https://perplexity.ai/*",
     "https://claude.ai/*",
-    "https://mentro-lucid-dust-3580.fly.dev/*",
-    "http://localhost/*"
+    "https://mentro-lucid-dust-3580.fly.dev/*"
   ],
   "background": {
     "service_worker": "dist/background.js",

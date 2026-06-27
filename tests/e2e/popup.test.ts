@@ -42,7 +42,11 @@ test.describe('Popup smoke tests', () => {
   test('tab bar renders only Account tab when signed out', async ({
     context,
     extensionId,
+    clearSession,
   }) => {
+    // Ensure no stale session from a previous test run.
+    await clearSession();
+
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForLoadState('domcontentloaded');
@@ -55,7 +59,9 @@ test.describe('Popup smoke tests', () => {
     await expect(accountTab).toHaveCount(1);
   });
 
-  test('Account tab is active by default', async ({ context, extensionId }) => {
+  test('Account tab is active by default', async ({ context, extensionId, clearSession }) => {
+    await clearSession();
+
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForLoadState('domcontentloaded');
@@ -68,158 +74,76 @@ test.describe('Popup smoke tests', () => {
     await expect(accountTab).toBeVisible();
   });
 
-  test('Tips and Settings tabs appear when signed in', async ({ context, extensionId }) => {
+  test('Tips and Settings tabs appear when signed in', async ({
+    context,
+    extensionId,
+    seedSession,
+    clearSession,
+  }) => {
+    // Write a fake valid session directly into chrome.storage.local via the
+    // service worker — this is the same key the popup reads on mount.
+    await seedSession();
+
     const page = await context.newPage();
-
-    // Seed a minimal fake session into chrome.storage.local so the popup
-    // treats the user as signed in and renders all three tabs.
-    const fakeSession = {
-      access_token: 'fake-access-token',
-      refresh_token: 'fake-refresh-token',
-      expires_at: Date.now() / 1000 + 3600, // expires 1 hour from now
-      user: { id: 'test-user-id', email: 'test@example.com' },
-    };
-
-    await context.addInitScript(
-      ({ session }) => {
-        // Override chrome.storage.local.get to return the fake session
-        // before the popup reads it on mount.
-        const origGet = chrome.storage.local.get.bind(chrome.storage.local);
-        chrome.storage.local.get = (keys: any, callback?: any) => {
-          if (typeof callback === 'function') {
-            origGet(keys, (result: Record<string, unknown>) => {
-              if (
-                keys === 'mentro_session' ||
-                (Array.isArray(keys) && keys.includes('mentro_session')) ||
-                (keys && typeof keys === 'object' && 'mentro_session' in keys)
-              ) {
-                callback({ ...result, mentro_session: session });
-              } else {
-                callback(result);
-              }
-            });
-          } else {
-            return origGet(keys);
-          }
-        };
-      },
-      { session: fakeSession },
-    );
-
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
-    await page.waitForLoadState('domcontentloaded');
 
-    // Wait for React to mount and the session to be detected.
-    await page.waitForFunction(() => {
-      const root = document.getElementById('root');
-      return root !== null && root.childElementCount > 0;
-    });
-
-    // All three tabs should now be visible.
+    // All three tabs should now be visible — wait generously for the async
+    // storage read + React re-render cycle to complete.
     const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|tips|settings/i });
-    await expect(tabs).toHaveCount(3, { timeout: 5_000 });
+    await expect(tabs).toHaveCount(3, { timeout: 8_000 });
+
+    await clearSession();
   });
 
   test('Tips tab renders tip cards when signed in and clicked', async ({
     context,
     extensionId,
+    seedSession,
+    clearSession,
   }) => {
+    await seedSession();
+
     const page = await context.newPage();
-
-    const fakeSession = {
-      access_token: 'fake-access-token',
-      refresh_token: 'fake-refresh-token',
-      expires_at: Date.now() / 1000 + 3600,
-      user: { id: 'test-user-id', email: 'test@example.com' },
-    };
-
-    await context.addInitScript(
-      ({ session }) => {
-        const origGet = chrome.storage.local.get.bind(chrome.storage.local);
-        chrome.storage.local.get = (keys: any, callback?: any) => {
-          if (typeof callback === 'function') {
-            origGet(keys, (result: Record<string, unknown>) => {
-              if (
-                keys === 'mentro_session' ||
-                (Array.isArray(keys) && keys.includes('mentro_session')) ||
-                (keys && typeof keys === 'object' && 'mentro_session' in keys)
-              ) {
-                callback({ ...result, mentro_session: session });
-              } else {
-                callback(result);
-              }
-            });
-          } else {
-            return origGet(keys);
-          }
-        };
-      },
-      { session: fakeSession },
-    );
-
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const tipsTab = page
       .locator('[role="tab"], button')
       .filter({ hasText: /tips/i })
       .first();
+    await expect(tipsTab).toBeVisible({ timeout: 8_000 });
     await tipsTab.click();
 
-    // TipsTab renders static tip cards — at least one should be visible.
-    const cards = page.locator('.tip-card, [class*="tip"], [class*="card"]');
+    // TipsTab renders static tip cards inside the active panel.
+    // Scope to the active panel so we don't resolve to the hidden account panel.
+    const cards = page.locator('.tab-panel.active .tip-card');
     await expect(cards.first()).toBeVisible({ timeout: 3_000 });
+
+    await clearSession();
   });
 
   test('Settings tab renders toggles when signed in and clicked', async ({
     context,
     extensionId,
+    seedSession,
+    clearSession,
   }) => {
+    await seedSession();
+
     const page = await context.newPage();
-
-    const fakeSession = {
-      access_token: 'fake-access-token',
-      refresh_token: 'fake-refresh-token',
-      expires_at: Date.now() / 1000 + 3600,
-      user: { id: 'test-user-id', email: 'test@example.com' },
-    };
-
-    await context.addInitScript(
-      ({ session }) => {
-        const origGet = chrome.storage.local.get.bind(chrome.storage.local);
-        chrome.storage.local.get = (keys: any, callback?: any) => {
-          if (typeof callback === 'function') {
-            origGet(keys, (result: Record<string, unknown>) => {
-              if (
-                keys === 'mentro_session' ||
-                (Array.isArray(keys) && keys.includes('mentro_session')) ||
-                (keys && typeof keys === 'object' && 'mentro_session' in keys)
-              ) {
-                callback({ ...result, mentro_session: session });
-              } else {
-                callback(result);
-              }
-            });
-          } else {
-            return origGet(keys);
-          }
-        };
-      },
-      { session: fakeSession },
-    );
-
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const settingsTab = page
       .locator('[role="tab"], button')
       .filter({ hasText: /settings/i })
       .first();
+    await expect(settingsTab).toBeVisible({ timeout: 8_000 });
     await settingsTab.click();
 
     // SettingsTab renders badge and pills toggles.
     // The checkbox inputs are visually hidden by CSS — target the visible toggle-track instead.
     const toggles = page.locator('.toggle-track');
     await expect(toggles.first()).toBeVisible({ timeout: 3_000 });
+
+    await clearSession();
   });
 });

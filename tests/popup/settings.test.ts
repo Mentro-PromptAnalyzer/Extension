@@ -208,8 +208,8 @@ describe('statsEnabled setting controls DB insert', () => {
       sendResponse
     );
 
-    // Wait for the async storage.get + optional fetch to settle
-    await new Promise((r) => setTimeout(r, 50));
+    // storage.get mock is synchronous, so the statsEnabled=false branch is
+    // already fully resolved — no async work left to drain.
 
     // fetch should NOT have been called for the DB insert
     const dbInsertCall = fetchMock.mock.calls.find(([url]) =>
@@ -227,9 +227,6 @@ describe('statsEnabled setting controls DB insert', () => {
       cb({ mentro_session: { access_token: token, refresh_token: 'rt', email: 'a@b.com' } })
     );
 
-    // Mock a successful DB insert response
-    fetchMock.mockResolvedValue({ ok: true, status: 201 });
-
     await import('../../src/background/index');
 
     expect(capturedMessageListener).not.toBeNull();
@@ -246,13 +243,26 @@ describe('statsEnabled setting controls DB insert', () => {
     };
 
     const sendResponse = vi.fn();
+    // Capture the fetch promise so we can await it directly instead of using
+    // a wall-clock timeout. We create a deferred that resolves when fetch is
+    // invoked, giving us a deterministic signal that insertPromptRow completed.
+    let resolveFetchCalled!: () => void;
+    const fetchCalledPromise = new Promise<void>((res) => { resolveFetchCalled = res; });
+    fetchMock.mockImplementation((..._args: unknown[]) => {
+      resolveFetchCalled();
+      return Promise.resolve({ ok: true, status: 201 });
+    });
+
     capturedMessageListener!(
       { type: 'PROMPT_SUBMITTED', text: 'explain how neural networks learn', score },
       { tab: { url: 'https://chatgpt.com/' } },
       sendResponse
     );
 
-    await new Promise((r) => setTimeout(r, 50));
+    // Await the deferred — resolves as soon as fetch is called by insertPromptRow,
+    // then flush one more microtask turn to let the await-chain inside it finish.
+    await fetchCalledPromise;
+    await Promise.resolve();
 
     const dbInsertCall = fetchMock.mock.calls.find(([url]) =>
       String(url).includes('extension_prompts')

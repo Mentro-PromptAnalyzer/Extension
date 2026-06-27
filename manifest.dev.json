@@ -1,0 +1,4 @@
+{
+  "_comment": "Dev-only host_permissions patch. To use: merge these overrides into manifest.json manually while testing against a local scoring server. Never commit a manifest.json that includes http://localhost/*.",
+  "host_permissions_add": ["http://localhost/*"]
+}
