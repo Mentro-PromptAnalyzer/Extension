@@ -39,20 +39,29 @@ test.describe('Popup smoke tests', () => {
     expect(childCount, '#root should have at least one child after React mounts').toBeGreaterThan(0);
   });
 
-  test('tab bar renders with Account, Tips, and Settings tabs', async ({
+  test('tab bar renders only Account tab when signed out', async ({
     context,
     extensionId,
+    clearSession,
   }) => {
+    // Ensure no stale session from a previous test run.
+    await clearSession();
+
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForLoadState('domcontentloaded');
 
-    // The App component renders three tab buttons.
+    // When signed out, Tips and Settings tabs are hidden — only Account is shown.
     const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|tips|settings/i });
-    await expect(tabs).toHaveCount(3);
+    await expect(tabs).toHaveCount(1);
+
+    const accountTab = tabs.filter({ hasText: /account/i });
+    await expect(accountTab).toHaveCount(1);
   });
 
-  test('Account tab is active by default', async ({ context, extensionId }) => {
+  test('Account tab is active by default', async ({ context, extensionId, clearSession }) => {
+    await clearSession();
+
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForLoadState('domcontentloaded');
@@ -65,36 +74,76 @@ test.describe('Popup smoke tests', () => {
     await expect(accountTab).toBeVisible();
   });
 
-  test('Tips tab renders tip cards when clicked', async ({ context, extensionId }) => {
+  test('Tips and Settings tabs appear when signed in', async ({
+    context,
+    extensionId,
+    seedSession,
+    clearSession,
+  }) => {
+    // Write a fake valid session directly into chrome.storage.local via the
+    // service worker — this is the same key the popup reads on mount.
+    await seedSession();
+
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
-    await page.waitForLoadState('domcontentloaded');
+
+    // All three tabs should now be visible — wait generously for the async
+    // storage read + React re-render cycle to complete.
+    const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|tips|settings/i });
+    await expect(tabs).toHaveCount(3, { timeout: 8_000 });
+
+    await clearSession();
+  });
+
+  test('Tips tab renders tip cards when signed in and clicked', async ({
+    context,
+    extensionId,
+    seedSession,
+    clearSession,
+  }) => {
+    await seedSession();
+
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
 
     const tipsTab = page
       .locator('[role="tab"], button')
       .filter({ hasText: /tips/i })
       .first();
+    await expect(tipsTab).toBeVisible({ timeout: 8_000 });
     await tipsTab.click();
 
-    // TipsTab renders static tip cards — at least one should be visible.
-    const cards = page.locator('.tip-card, [class*="tip"], [class*="card"]');
+    // TipsTab renders static tip cards inside the active panel.
+    // Scope to the active panel so we don't resolve to the hidden account panel.
+    const cards = page.locator('.tab-panel.active .tip-card');
     await expect(cards.first()).toBeVisible({ timeout: 3_000 });
+
+    await clearSession();
   });
 
-  test('Settings tab renders toggles when clicked', async ({ context, extensionId }) => {
+  test('Settings tab renders toggles when signed in and clicked', async ({
+    context,
+    extensionId,
+    seedSession,
+    clearSession,
+  }) => {
+    await seedSession();
+
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
-    await page.waitForLoadState('domcontentloaded');
 
     const settingsTab = page
       .locator('[role="tab"], button')
       .filter({ hasText: /settings/i })
       .first();
+    await expect(settingsTab).toBeVisible({ timeout: 8_000 });
     await settingsTab.click();
 
     // SettingsTab renders badge and pills toggles.
     // The checkbox inputs are visually hidden by CSS — target the visible toggle-track instead.
     const toggles = page.locator('.toggle-track');
     await expect(toggles.first()).toBeVisible({ timeout: 3_000 });
+
+    await clearSession();
   });
 });

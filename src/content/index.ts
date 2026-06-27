@@ -48,6 +48,10 @@ let lastScoredText = '';
 let lastAiScore: LiveScore | null = null;
 let lastAiText = '';
 
+// Last fully-rendered score for the current input text — used when the user
+// submits so the DB row reflects the final AI-merged score, not just heuristic.
+let lastRenderedScore: LiveScore | null = null;
+
 let activeInput: HTMLElement | null = null;
 let activeObserver: MutationObserver | null = null;
 
@@ -223,6 +227,8 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
     }
     setBadgeLoading(false);
     hideFeedback();
+    // Clear the rendered score so a submit mid-AI-scoring uses heuristic only
+    lastRenderedScore = null;
   }
 
   debounceTimer = setTimeout(() => {
@@ -240,6 +246,7 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
     const heuristicScore = analyzePrompt(text);
     const displayScore = blendWithAiScore(heuristicScore, text);
     lastScoredText = text;
+    lastRenderedScore = displayScore; // best score so far — may be upgraded by AI
     if (contentSettings.badgeEnabled) {
       renderOverlay(displayScore, el, platform ?? undefined);
     }
@@ -324,6 +331,7 @@ async function scheduleAIScore(
 
   lastAiScore = merged as LiveScore;
   lastAiText = text;
+  lastRenderedScore = merged as LiveScore; // AI score is now the best available
 
   if (contentSettings.badgeEnabled) {
     renderOverlay(merged, el, platform ?? undefined);
@@ -367,7 +375,10 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
     if (ke.key === 'Enter' && !ke.shiftKey) {
       const text = getInputText(input);
       if (text.trim().length > 0) {
-        safeSendMessage({ type: 'PROMPT_SUBMITTED', text, score: analyzePrompt(text) });
+        // Use the best score available: AI-merged if it has landed for this
+        // exact text, otherwise the blended heuristic score currently displayed.
+        const score = lastRenderedScore ?? analyzePrompt(text);
+        safeSendMessage({ type: 'PROMPT_SUBMITTED', text, score });
       }
     }
   });
@@ -377,7 +388,8 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
     sendBtn?.addEventListener('click', () => {
       const text = getInputText(input);
       if (text.trim().length > 0) {
-        safeSendMessage({ type: 'PROMPT_SUBMITTED', text, score: analyzePrompt(text) });
+        const score = lastRenderedScore ?? analyzePrompt(text);
+        safeSendMessage({ type: 'PROMPT_SUBMITTED', text, score });
       }
     });
   }
@@ -425,6 +437,7 @@ const navObserver = new MutationObserver(() => {
     lastUrl = location.href;
     lastAiScore = null;
     lastAiText = '';
+    lastRenderedScore = null;
     hideOverlay();
     // Re-check the input after navigation — the new chat may have a draft
     setTimeout(() => {

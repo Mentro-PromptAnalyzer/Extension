@@ -8,7 +8,11 @@
  * navigate directly to chrome-extension://<id>/popup.html.
  */
 
-import { test as base, chromium, type BrowserContext } from '@playwright/test';
+import {
+  test as base,
+  chromium,
+  type BrowserContext,
+} from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -21,6 +25,18 @@ const EXTENSION_ROOT = path.resolve(__dirname, '..', '..');
 export type ExtensionFixtures = {
   context: BrowserContext;
   extensionId: string;
+  /** Write a fake signed-in session to chrome.storage.local. */
+  seedSession: () => Promise<void>;
+  /** Clear the session from chrome.storage.local. */
+  clearSession: () => Promise<void>;
+};
+
+const FAKE_SESSION = {
+  access_token: 'fake-access-token',
+  refresh_token: 'fake-refresh-token',
+  // expires 1 hour from now — isTokenExpiringSoon returns false, no refresh attempted
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  email: 'test@example.com',
 };
 
 export const test = base.extend<ExtensionFixtures>({
@@ -41,10 +57,8 @@ export const test = base.extend<ExtensionFixtures>({
     await ctx.close();
   },
 
-  // Derive the extension ID from the service worker URL that Chrome registers.
+  // Derive the extension ID from the background service worker URL.
   extensionId: async ({ context }, use) => {
-    // Wait for the background service worker to appear — it registers shortly
-    // after the extension loads.
     let [background] = context.serviceWorkers();
     if (!background) {
       background = await context.waitForEvent('serviceworker', { timeout: 10_000 });
@@ -52,6 +66,48 @@ export const test = base.extend<ExtensionFixtures>({
     // URL format: chrome-extension://<id>/dist/background.js
     const id = background.url().split('/')[2];
     await use(id);
+  },
+
+  // Helper: write a fake session directly into chrome.storage.local.
+  // Runs inside a real extension page so chrome.storage is always available.
+  seedSession: async ({ context, extensionId }, use) => {
+    const seed = async () => {
+      const page = await context.newPage();
+      try {
+        await page.goto(`chrome-extension://${extensionId}/popup.html`);
+        await page.waitForFunction(() => typeof chrome !== 'undefined' && !!chrome.storage);
+        await page.evaluate(
+          (session) =>
+            new Promise<void>((resolve) =>
+              chrome.storage.local.set({ mentro_session: session }, resolve),
+            ),
+          FAKE_SESSION,
+        );
+      } finally {
+        await page.close();
+      }
+    };
+    await use(seed);
+  },
+
+  // Helper: remove the session so later tests start clean.
+  clearSession: async ({ context, extensionId }, use) => {
+    const clear = async () => {
+      const page = await context.newPage();
+      try {
+        await page.goto(`chrome-extension://${extensionId}/popup.html`);
+        await page.waitForFunction(() => typeof chrome !== 'undefined' && !!chrome.storage);
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              chrome.storage.local.remove('mentro_session', resolve),
+            ),
+        );
+      } finally {
+        await page.close();
+      }
+    };
+    await use(clear);
   },
 });
 

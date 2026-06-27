@@ -90,7 +90,16 @@ export function App() {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [ready, setReady] = useState(false);
+  const [statsReloadKey, setStatsReloadKey] = useState(0);
   const platform = usePlatform();
+
+  const isSignedIn = session !== null;
+
+  // When the user signs out, snap back to the account tab so they
+  // don't end up on Settings/Tips with a stale signed-in-only view.
+  useEffect(() => {
+    if (!isSignedIn) setActiveTab('account');
+  }, [isSignedIn]);
 
   useEffect(() => {
     // Resolve with defaults after 3 s so the UI never stays blank indefinitely
@@ -121,27 +130,42 @@ export function App() {
       </div>
 
       <div className="tabs">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            className={`tab-btn${activeTab === tab.id ? ' active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {TABS.map((tab) => {
+          // Hide Tips and Settings tabs when signed out
+          if (!isSignedIn && tab.id !== 'account') return null;
+          return (
+            <button
+              key={tab.id}
+              className={`tab-btn${activeTab === tab.id ? ' active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {ready ? (
         <>
           <div className={`tab-panel${activeTab === 'account' ? ' active' : ''}`}>
-            <AccountTab session={session} onSessionChange={setSession} />
+            <AccountTab
+              session={session}
+              onSessionChange={setSession}
+              statsEnabled={settings.statsEnabled}
+              isActive={activeTab === 'account'}
+              reloadKey={statsReloadKey}
+            />
           </div>
           <div className={`tab-panel${activeTab === 'tips' ? ' active' : ''}`}>
             <TipsTab />
           </div>
           <div className={`tab-panel${activeTab === 'settings' ? ' active' : ''}`}>
-            <SettingsTab settings={settings} onSettingsChange={setSettings} />
+            <SettingsTab
+              settings={settings}
+              onSettingsChange={setSettings}
+              session={session}
+              onDeleteDone={() => setStatsReloadKey((k) => k + 1)}
+            />
           </div>
         </>
       ) : (
