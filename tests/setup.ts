@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // ---------------------------------------------------------------------------
 // Vitest global setup — stubs browser extension APIs that are unavailable
 // in the Node.js test environment.
