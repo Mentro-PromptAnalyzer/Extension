@@ -213,7 +213,7 @@ describe('statsEnabled setting controls DB insert', () => {
 
     // fetch should NOT have been called for the DB insert
     const dbInsertCall = fetchMock.mock.calls.find(([url]) =>
-      String(url).includes('extension_prompts')
+      String(url).includes('prompt_scores')
     );
     expect(dbInsertCall).toBeUndefined();
   });
@@ -265,7 +265,7 @@ describe('statsEnabled setting controls DB insert', () => {
     await Promise.resolve();
 
     const dbInsertCall = fetchMock.mock.calls.find(([url]) =>
-      String(url).includes('extension_prompts')
+      String(url).includes('prompt_scores')
     );
     expect(dbInsertCall).toBeDefined();
     // Confirm it was a POST to the correct endpoint
@@ -297,14 +297,14 @@ describe('deleteAllPrompts', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('sends a DELETE request to the extension_prompts endpoint', async () => {
+  it('sends a DELETE request to the prompt_scores endpoint', async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 204 });
     const token = makeJwt('user-test-999');
     await deleteAllPrompts(token);
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('extension_prompts');
+    expect(url).toContain('prompt_scores');
     expect(options.method).toBe('DELETE');
   });
 
