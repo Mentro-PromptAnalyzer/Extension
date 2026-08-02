@@ -57,6 +57,19 @@ export function injectGlassDefs(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Arc dash-array helper
+// ---------------------------------------------------------------------------
+
+/** Clamp a 0–100 value and return the filled/gap stroke-dasharray string. */
+export function arcDashArray(value: number): string {
+  const clamped = Math.max(0, Math.min(100, value));
+  const circumference = 2 * Math.PI * RING_R;
+  const filled = circumference * (clamped / 100);
+  const gap = circumference - filled;
+  return `${filled} ${gap}`;
+}
+
+// ---------------------------------------------------------------------------
 // Circle SVG builder — used by both the badge and the metric bubbles
 // ---------------------------------------------------------------------------
 
@@ -70,9 +83,8 @@ export function buildCircleSvg(
   arc: SVGCircleElement;
   scoreText: SVGTextElement;
 } {
-  const circumference = 2 * Math.PI * RING_R;
-  const filled = circumference * (value / 100);
-  const gap = circumference - filled;
+  const clamped = Math.max(0, Math.min(100, value));
+  const dashArray = arcDashArray(clamped);
   const cx = String(BADGE_SIZE / 2);
   const cy = String(BADGE_SIZE / 2);
 
@@ -137,7 +149,7 @@ export function buildCircleSvg(
     stroke: color,
     'stroke-width': String(RING_STROKE),
     'stroke-linecap': 'round',
-    'stroke-dasharray': `${filled} ${gap}`,
+    'stroke-dasharray': dashArray,
     transform: `rotate(-90 ${cx} ${cy})`,
     ...(idPrefix ? { id: `${idPrefix}-arc` } : {}),
   }) as SVGCircleElement;
@@ -156,7 +168,7 @@ export function buildCircleSvg(
     'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     ...(idPrefix ? { id: `${idPrefix}-text` } : {}),
   }) as SVGTextElement;
-  scoreText.textContent = String(value);
+  scoreText.textContent = String(clamped);
   svg.appendChild(scoreText);
 
   return { svg, glassBg, arc, scoreText };
@@ -177,15 +189,19 @@ export function findInputBar(inputEl: HTMLElement, platform?: PlatformConfig): H
   }
 
   if (platform?.sendButtonSelector) {
-    const sendBtn = document.querySelector<HTMLElement>(platform.sendButtonSelector);
-    if (sendBtn) {
-      let el: HTMLElement = inputEl;
-      while (el.parentElement && el.parentElement !== document.body) {
-        const parent = el.parentElement;
-        if (parent.contains(sendBtn)) return parent;
-        if (parent.getBoundingClientRect().width >= window.innerWidth) break;
-        el = parent;
+    try {
+      const sendBtn = document.querySelector<HTMLElement>(platform.sendButtonSelector);
+      if (sendBtn) {
+        let el: HTMLElement = inputEl;
+        while (el.parentElement && el.parentElement !== document.body) {
+          const parent = el.parentElement;
+          if (parent.contains(sendBtn)) return parent;
+          if (parent.getBoundingClientRect().width >= window.innerWidth) break;
+          el = parent;
+        }
       }
+    } catch {
+      /* malformed selector — fall through */
     }
   }
 
@@ -249,6 +265,20 @@ export function positionBadge(
   badge.style.left = `${rect.left - size - 14}px`;
 }
 
+// ---------------------------------------------------------------------------
+// Plus button polling — cancelable interval
+// ---------------------------------------------------------------------------
+
+let plusButtonInterval: ReturnType<typeof setInterval> | null = null;
+
+/** Cancel any active plus-button polling interval. */
+export function cancelPlusButtonPoll(): void {
+  if (plusButtonInterval !== null) {
+    clearInterval(plusButtonInterval);
+    plusButtonInterval = null;
+  }
+}
+
 /**
  * Polls up to ~3 s for the + button then repositions the badge.
  */
@@ -257,15 +287,16 @@ export function waitForPlusButtonAndReposition(
   inputBar: HTMLElement,
   platform: PlatformConfig
 ): void {
+  cancelPlusButtonPoll();
   let attempts = 0;
-  const interval = setInterval(() => {
+  plusButtonInterval = setInterval(() => {
     attempts++;
     const btn = findPlusButton(platform.plusButtonSelector!);
     if (btn) {
-      clearInterval(interval);
+      cancelPlusButtonPoll();
       positionBadge(badge, inputBar, platform);
       return;
     }
-    if (attempts >= 30) clearInterval(interval);
+    if (attempts >= 30) cancelPlusButtonPoll();
   }, 100);
 }

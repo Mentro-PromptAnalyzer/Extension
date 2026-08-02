@@ -184,8 +184,9 @@ export async function fetchAIScore(
     const decoder = new TextDecoder();
     let buffer = '';
     let accumulated = '';
+    let streamDone = false;
 
-    while (true) {
+    while (!streamDone) {
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -213,6 +214,7 @@ export async function fetchAIScore(
           const token = (payload as { text?: string })?.text;
           if (token) accumulated += token;
         } else if (event === 'end') {
+          streamDone = true;
           break;
         } else if (event === 'error') {
           return null;

@@ -351,9 +351,7 @@ export function attachInputBarHover(inputEl: HTMLElement, platform?: PlatformCon
   inputBar.addEventListener('mouseenter', inputBarEnterListener);
   inputBar.addEventListener('mouseleave', inputBarLeaveListener);
 
-  if (inputBar.matches(':hover')) {
-    mouseInsideInputBar = true;
-  }
+  mouseInsideInputBar = inputBar.matches(':hover');
 }
 
 export function renderFeedback(
@@ -369,6 +367,7 @@ export function renderFeedback(
   pendingLoginPrompt = false;
   if (feedbackVisible) {
     document.querySelectorAll<HTMLElement>(`.${CLASS_FEEDBACK}`).forEach((p) => p.remove());
+    document.getElementById(ID_FEEDBACK_BRIDGE)?.remove();
     feedbackVisible = false;
   }
   if (mouseInsideInputBar) {

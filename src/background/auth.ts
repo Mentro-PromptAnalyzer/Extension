@@ -85,11 +85,19 @@ export async function refreshStoredSession(session: StoredSession): Promise<Stor
   }
 }
 
+// Serialise concurrent refresh attempts to avoid rotating refresh tokens racing.
+let inflight: Promise<StoredSession | null> | null = null;
+
 export async function getValidAccessToken(): Promise<string | null> {
   const session = await getStoredSession();
   if (!session) return null;
   if (isTokenExpiringSoonBg(session)) {
-    const refreshed = await refreshStoredSession(session);
+    if (!inflight) {
+      inflight = refreshStoredSession(session).finally(() => {
+        inflight = null;
+      });
+    }
+    const refreshed = await inflight;
     return refreshed?.access_token ?? session.access_token;
   }
   return session.access_token;
@@ -122,7 +130,7 @@ export async function handleOAuthSignIn(
       });
     });
 
-    console.log('[oauth] Callback URL received:', callbackUrl);
+    console.log('[oauth] Callback URL received (length):', callbackUrl.length);
 
     const parsed = new URL(callbackUrl);
     const params = new URLSearchParams(parsed.hash.slice(1));

@@ -565,7 +565,7 @@ body {
   background: rgba(255, 255, 255, 0.04);
 }
 .stat-row:hover .stat-row-caret {
-  color: var(--m-brand-80, rgba(167, 139, 250, 0.8));
+  color: var(--m-brand-80);
   transform: translateX(2px);
 }
 
@@ -617,7 +617,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--m-brand-65, rgba(167, 139, 250, 0.65));
+  color: var(--m-brand-65);
   padding: 0 0 6px 0;
   border-bottom: 1px solid var(--m-border-subtle);
   width: 100%;

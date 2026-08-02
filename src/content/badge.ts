@@ -6,7 +6,6 @@ import type { LiveScore } from '../analysis/engine';
 import type { PlatformConfig } from './selectors';
 import {
   BADGE_SIZE,
-  RING_R,
   Z_BADGE,
   ID_BADGE,
   ID_BADGE_SVG,
@@ -17,12 +16,14 @@ import {
   getScoreColor,
 } from './theme';
 import {
+  arcDashArray,
   buildCircleSvg,
   injectGlassDefs,
   findInputBar,
   findPlusButton,
   positionBadge,
   waitForPlusButtonAndReposition,
+  cancelPlusButtonPoll,
 } from './dom-utils';
 import { showBubbles, hideBubbles, setCurrentScore } from './bubbles';
 
@@ -33,6 +34,7 @@ import { showBubbles, hideBubbles, setCurrentScore } from './bubbles';
 let detailedMetricsEnabled = false;
 let currentScore: LiveScore | null = null;
 let scoreAnimFrame: number | null = null;
+let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function setDetailedMetricsEnabled(enabled: boolean): void {
   detailedMetricsEnabled = enabled;
@@ -112,6 +114,15 @@ export function renderOverlay(
 
   let badge = document.getElementById(ID_BADGE) as HTMLElement | null;
 
+  if (badge) {
+    // Cancel any pending removal from a prior hideOverlay call
+    if (hideTimeout !== null) {
+      clearTimeout(hideTimeout);
+      hideTimeout = null;
+    }
+    badge.style.opacity = '1';
+  }
+
   if (!badge) {
     injectGlassDefs();
 
@@ -164,11 +175,8 @@ export function renderOverlay(
   }
   const arc = badge.querySelector('#mentro-badge-arc');
   if (arc) {
-    const circumference = 2 * Math.PI * RING_R;
-    const filled = circumference * (score.overall / 100);
-    const gap = circumference - filled;
     arc.setAttribute('stroke', color);
-    arc.setAttribute('stroke-dasharray', `${filled} ${gap}`);
+    arc.setAttribute('stroke-dasharray', arcDashArray(score.overall));
   }
   const text = badge.querySelector('#mentro-badge-text');
   if (text) {
@@ -193,6 +201,10 @@ export function hideOverlay(): void {
   const badge = document.getElementById(ID_BADGE);
   if (badge) {
     badge.style.opacity = '0';
-    setTimeout(() => badge.remove(), 200);
+    hideTimeout = setTimeout(() => {
+      badge.remove();
+      hideTimeout = null;
+    }, 200);
   }
+  cancelPlusButtonPoll();
 }

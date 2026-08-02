@@ -326,7 +326,7 @@ function SignedInView({
   isActive: boolean;
   linkedProviders: Set<string>;
   onSignOut: () => void;
-  onLinkOAuth: (provider: OAuthProvider) => void;
+  onLinkOAuth: (provider: OAuthProvider) => Promise<void>;
   onReload: () => void;
 }) {
   const [detail, setDetail] = useState<DetailKey | null>(null);
@@ -383,10 +383,11 @@ function SignedInView({
               <button
                 key={id}
                 className={`account-option-btn${isLinked ? ' linked' : ''}`}
-                onClick={() => {
+                onClick={async () => {
                   if (isLinked) return;
                   setLinkingProvider(id);
-                  onLinkOAuth(id);
+                  await onLinkOAuth(id);
+                  setLinkingProvider(null);
                 }}
                 disabled={isLinked || linkingProvider !== null}
               >
@@ -502,10 +503,11 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
   const [statsError, setStatsError] = useState(false);
   const [linkedProviders, setLinkedProviders] = useState<Set<string>>(new Set());
 
-  async function loadStats(token: string) {
+  async function loadStats(token: string, cancelled?: boolean) {
     setStatsLoading(true);
     setStatsError(false);
     const result = await fetchLifetimeStats(token);
+    if (cancelled) return;
     if (result.ok) {
       setStats(result.stats);
     } else {
@@ -514,13 +516,15 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
     setStatsLoading(false);
   }
 
-  async function refreshStatsSilently(token: string) {
+  async function refreshStatsSilently(token: string, cancelled?: boolean) {
     const result = await fetchLifetimeStats(token);
+    if (cancelled) return;
     if (result.ok) setStats(result.stats);
   }
 
-  async function loadIdentities(token: string) {
+  async function loadIdentities(token: string, cancelled?: boolean) {
     const result = await fetchUserIdentities(token);
+    if (cancelled) return;
     if (result.ok) {
       setLinkedProviders(getLinkedProviders(result.identities));
     }
@@ -533,25 +537,32 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
       return;
     }
 
+    let cancelled = false;
     let token: string | null = null;
 
     getValidSession()
       .then((validSession) => {
+        if (cancelled) return;
         if (!validSession) return Promise.reject(new Error('no session'));
         if (validSession.access_token !== session.access_token) {
           onSessionChange(validSession);
         }
         token = validSession.access_token;
-        void loadIdentities(token);
-        return loadStats(token);
+        void loadIdentities(token, cancelled);
+        return loadStats(token, cancelled);
       })
-      .catch(() => setStatsError(true));
+      .catch(() => {
+        if (!cancelled) setStatsError(true);
+      });
 
     const interval = setInterval(() => {
-      if (token) void refreshStatsSilently(token);
+      if (token && !cancelled) void refreshStatsSilently(token, cancelled);
     }, 10_000);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [session, reloadKey]);
 
   async function handleOAuth(provider: OAuthProvider) {

@@ -10,7 +10,9 @@
   --m-brand-rgb: 167, 139, 250;
   --m-brand: rgba(var(--m-brand-rgb), 1);
   --m-brand-90: rgba(var(--m-brand-rgb), 0.9);
+  --m-brand-80: rgba(var(--m-brand-rgb), 0.8);
   --m-brand-70: rgba(var(--m-brand-rgb), 0.7);
+  --m-brand-65: rgba(var(--m-brand-rgb), 0.65);
   --m-brand-55: rgba(var(--m-brand-rgb), 0.55);
   --m-brand-35: rgba(var(--m-brand-rgb), 0.35);
   --m-brand-25: rgba(var(--m-brand-rgb), 0.25);
