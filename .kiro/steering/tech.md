@@ -27,7 +27,7 @@
 
 ## Testing
 
-- **Unit tests**: Vitest (`npm run test`) — `tests/analysis/` covers classifier, engine, rubric, stopWords, tfidf
+- **Unit tests**: Vitest (`npm run test`) — `tests/analysis/` covers classifier, engine, rubric, stopWords, tfidf; `tests/popup/` covers settings and stats logic
 - **E2E tests**: Playwright (`npm run test:e2e`) — `tests/e2e/` loads the built extension in a real Chromium context and smoke-tests the popup UI
 - Coverage via `@vitest/coverage-v8` (`npm run test:coverage`)
 - E2E requires a built `dist/` — run `npm run build` first
