@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { TipsTab } from './TipsTab';
 import { SettingsTab } from './SettingsTab';
 import { AccountTab } from './AccountTab';
 import { AuthSession, getValidSession } from '../auth';
 import { Settings, loadSettings, DEFAULT_SETTINGS } from '../settings';
 
-type Tab = 'tips' | 'settings' | 'account';
+type Tab = 'settings' | 'account';
 type Platform = 'chatgpt' | 'gemini' | 'perplexity' | 'claude' | 'inactive';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'account', label: 'Account' },
-  { id: 'tips', label: 'Tips' },
   { id: 'settings', label: 'Settings' },
 ];
 
@@ -155,9 +153,6 @@ export function App() {
               isActive={activeTab === 'account'}
               reloadKey={statsReloadKey}
             />
-          </div>
-          <div className={`tab-panel${activeTab === 'tips' ? ' active' : ''}`}>
-            <TipsTab />
           </div>
           <div className={`tab-panel${activeTab === 'settings' ? ' active' : ''}`}>
             <SettingsTab

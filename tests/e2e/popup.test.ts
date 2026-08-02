@@ -51,8 +51,8 @@ test.describe('Popup smoke tests', () => {
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForLoadState('domcontentloaded');
 
-    // When signed out, Tips and Settings tabs are hidden — only Account is shown.
-    const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|tips|settings/i });
+    // When signed out, Settings tab is hidden — only Account is shown.
+    const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|settings/i });
     await expect(tabs).toHaveCount(1);
 
     const accountTab = tabs.filter({ hasText: /account/i });
@@ -74,7 +74,7 @@ test.describe('Popup smoke tests', () => {
     await expect(accountTab).toBeVisible();
   });
 
-  test('Tips and Settings tabs appear when signed in', async ({
+  test('Settings tab appears when signed in', async ({
     context,
     extensionId,
     seedSession,
@@ -87,15 +87,15 @@ test.describe('Popup smoke tests', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
 
-    // All three tabs should now be visible — wait generously for the async
+    // Both tabs should now be visible — wait generously for the async
     // storage read + React re-render cycle to complete.
-    const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|tips|settings/i });
-    await expect(tabs).toHaveCount(3, { timeout: 8_000 });
+    const tabs = page.locator('[role="tab"], button').filter({ hasText: /account|settings/i });
+    await expect(tabs).toHaveCount(2, { timeout: 8_000 });
 
     await clearSession();
   });
 
-  test('Tips tab renders tip cards when signed in and clicked', async ({
+  test('Metrics tips panel shows when info button is clicked in Settings', async ({
     context,
     extensionId,
     seedSession,
@@ -106,16 +106,20 @@ test.describe('Popup smoke tests', () => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
 
-    const tipsTab = page
+    const settingsTab = page
       .locator('[role="tab"], button')
-      .filter({ hasText: /tips/i })
+      .filter({ hasText: /settings/i })
       .first();
-    await expect(tipsTab).toBeVisible({ timeout: 8_000 });
-    await tipsTab.click();
+    await expect(settingsTab).toBeVisible({ timeout: 8_000 });
+    await settingsTab.click();
 
-    // TipsTab renders static tip cards inside the active panel.
-    // Scope to the active panel so we don't resolve to the hidden account panel.
-    const cards = page.locator('.tab-panel.active .tip-card');
+    // Click the ? info button to expand the metrics tips panel
+    const infoBtn = page.locator('.metrics-info-btn');
+    await expect(infoBtn).toBeVisible({ timeout: 3_000 });
+    await infoBtn.click();
+
+    // Tip rows should now be visible inside the expanded card
+    const cards = page.locator('.metrics-tips-inline .metric-tip-row');
     await expect(cards.first()).toBeVisible({ timeout: 3_000 });
 
     await clearSession();

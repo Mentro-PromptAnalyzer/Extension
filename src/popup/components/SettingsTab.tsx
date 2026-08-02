@@ -9,10 +9,59 @@ interface Props {
   onDeleteDone: () => void;
 }
 
+// ---------------------------------------------------------------------------
+// Metric tips data (formerly in TipsTab)
+// ---------------------------------------------------------------------------
+
+interface MetricTip {
+  color: string;
+  borderColor: string;
+  shadowColor: string;
+  svgFill: string;
+  title: string;
+  body: string;
+}
+
+const METRIC_TIPS: MetricTip[] = [
+  {
+    color: 'rgba(74, 222, 128, 0.15)',
+    borderColor: 'rgba(74, 222, 128, 0.35)',
+    shadowColor: 'rgba(74, 222, 128, 0.15)',
+    svgFill: '#4ade80',
+    title: 'Ownership',
+    body: "Show what you've tried or your constraints.",
+  },
+  {
+    color: 'rgba(251, 191, 36, 0.15)',
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+    shadowColor: 'rgba(251, 191, 36, 0.15)',
+    svgFill: '#fbbf24',
+    title: 'Depth',
+    body: 'Ask why or how, not just what.',
+  },
+  {
+    color: 'rgba(248, 113, 113, 0.15)',
+    borderColor: 'rgba(248, 113, 113, 0.35)',
+    shadowColor: 'rgba(248, 113, 113, 0.15)',
+    svgFill: '#f87171',
+    title: 'Critical',
+    body: 'Probe edge cases, risks, or alternatives.',
+  },
+  {
+    color: 'rgba(96, 165, 250, 0.15)',
+    borderColor: 'rgba(96, 165, 250, 0.35)',
+    shadowColor: 'rgba(96, 165, 250, 0.15)',
+    svgFill: '#60a5fa',
+    title: 'Clarity',
+    body: 'Name your tools, audience, format, and goal.',
+  },
+];
+
 export function SettingsTab({ settings, onSettingsChange, session, onDeleteDone }: Props) {
   const [toastVisible, setToastVisible] = useState(false);
   const [deleteStage, setDeleteStage] = useState<'idle' | 'confirm' | 'deleting' | 'done'>('idle');
   const [deleteError, setDeleteError] = useState('');
+  const [tipsExpanded, setTipsExpanded] = useState(false);
 
   function persist(next: Settings) {
     onSettingsChange(next);
@@ -90,6 +139,59 @@ export function SettingsTab({ settings, onSettingsChange, session, onDeleteDone 
           />
           <div className="toggle-track" />
         </label>
+      </div>
+
+      <div
+        className={`setting-card sub-setting${!settings.badgeEnabled ? ' disabled' : ''}${tipsExpanded && settings.badgeEnabled ? ' expanded' : ''}`}
+      >
+        <div className="sub-setting-top">
+          <div className="setting-info">
+            <div className="setting-label">Detailed metrics</div>
+            <div className="setting-desc">Show the 4 scoring dimensions on badge hover.</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className={`metrics-info-btn${tipsExpanded ? ' active' : ''}`}
+              onClick={() => setTipsExpanded(!tipsExpanded)}
+              disabled={!settings.badgeEnabled}
+              aria-label={tipsExpanded ? 'Hide metric tips' : 'Learn about metrics'}
+              aria-expanded={tipsExpanded}
+            >
+              {tipsExpanded ? '×' : '?'}
+            </button>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={settings.detailedMetricsEnabled}
+                disabled={!settings.badgeEnabled}
+                onChange={(e) => persist({ ...settings, detailedMetricsEnabled: e.target.checked })}
+              />
+              <div className="toggle-track" />
+            </label>
+          </div>
+        </div>
+        {tipsExpanded && settings.badgeEnabled && (
+          <div className="metrics-tips-inline">
+            {METRIC_TIPS.map((tip) => (
+              <div key={tip.title} className="metric-tip-row">
+                <div
+                  className="tip-dot"
+                  style={{
+                    background: tip.color,
+                    border: `1px solid ${tip.borderColor}`,
+                    boxShadow: `0 0 6px 1px ${tip.shadowColor}`,
+                  }}
+                >
+                  <svg width="8" height="8" viewBox="0 0 10 10">
+                    <circle cx="5" cy="5" r="3" fill={tip.svgFill} />
+                  </svg>
+                </div>
+                <span className="metric-tip-title">{tip.title}</span>
+                <span className="metric-tip-body">{tip.body}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="settings-gap" />

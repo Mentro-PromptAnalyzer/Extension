@@ -6,6 +6,8 @@
 
 html {
   overflow: hidden;
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  border-radius: 12px;
 }
 
 ::-webkit-scrollbar {
@@ -24,10 +26,12 @@ html {
 
 body {
   width: 320px;
+  height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: #111113;
   color: #f0eef5;
-  overflow-x: hidden;
 }
 
 /* ── Header ── */
@@ -36,7 +40,10 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  top: 0;
+  background: #111113;
+  z-index: 10;
 }
 .header h1 {
   font-size: 13px;
@@ -58,7 +65,12 @@ body {
 /* ── Tabs ── */
 .tabs {
   display: flex;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  position: sticky;
+  top: 42px;
+  background: #111113;
+  z-index: 10;
 }
 .tab-btn {
   flex: 1;
@@ -193,6 +205,92 @@ body {
 }
 .setting-card:hover {
   border-color: rgba(255, 255, 255, 0.14);
+}
+.setting-card.sub-setting {
+  margin-left: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.008) 100%);
+  border-color: rgba(255, 255, 255, 0.06);
+  border-top-color: rgba(255, 255, 255, 0.08);
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+}
+.setting-card.sub-setting .sub-setting-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.setting-card.sub-setting.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.metrics-info-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: rgba(167, 139, 250, 0.9);
+  font-size: 10px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.metrics-info-btn:hover:not(:disabled) {
+  background: rgba(167, 139, 250, 0.22);
+  border-color: rgba(167, 139, 250, 0.55);
+  box-shadow: 0 0 10px 1px rgba(167, 139, 250, 0.18);
+}
+.metrics-info-btn.active {
+  background: rgba(167, 139, 250, 0.25);
+  border-color: rgba(167, 139, 250, 0.6);
+  box-shadow: 0 0 10px 2px rgba(167, 139, 250, 0.25);
+  padding-bottom: 2px;
+}
+.metrics-info-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.metrics-tips-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 10px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 0;
+}
+.metric-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 4px;
+}
+.metric-tip-row .tip-dot {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+}
+.metric-tip-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(240, 238, 245, 0.8);
+  white-space: nowrap;
+  min-width: 68px;
+}
+.metric-tip-body {
+  font-size: 10px;
+  color: rgba(240, 238, 245, 0.4);
+  line-height: 1.3;
 }
 .setting-info {
   flex: 1;

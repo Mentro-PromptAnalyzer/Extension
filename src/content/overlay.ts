@@ -37,6 +37,14 @@ const KEYS: (keyof LiveScore)[] = ['ownership', 'depth', 'critical', 'clarity'];
 // Module-level state
 // ---------------------------------------------------------------------------
 
+let detailedMetricsEnabled = false;
+
+/** Called by the content script when settings load or change. */
+export function setDetailedMetricsEnabled(enabled: boolean): void {
+  detailedMetricsEnabled = enabled;
+  if (!enabled) hideBubbles();
+}
+
 let currentScore: LiveScore | null = null;
 let bubblesVisible = false;
 let feedbackVisible = false;
@@ -1026,7 +1034,7 @@ export function renderOverlay(
       const s = document.getElementById('mentro-badge-svg');
       if (s)
         s.style.filter = `drop-shadow(0 3px 16px ${getScoreColor(currentScore?.overall ?? 0)}88)`;
-      showBubbles(badge!);
+      if (detailedMetricsEnabled) showBubbles(badge!);
     });
     badge.addEventListener('mouseleave', (e: MouseEvent) => {
       const s = document.getElementById('mentro-badge-svg');

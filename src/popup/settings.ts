@@ -6,12 +6,14 @@ export interface Settings {
   pillsEnabled: boolean;
   badgeEnabled: boolean;
   statsEnabled: boolean;
+  detailedMetricsEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   pillsEnabled: true,
   badgeEnabled: true,
   statsEnabled: true,
+  detailedMetricsEnabled: false,
 };
 
 export async function loadSettings(): Promise<Settings> {
