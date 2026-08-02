@@ -14,6 +14,7 @@ import {
   CLASS_PULSE,
   ID_PULSE_STYLE,
   getScoreColor,
+  getBrandRgb,
 } from './theme';
 import {
   arcDashArray,
@@ -45,14 +46,17 @@ export function setDetailedMetricsEnabled(enabled: boolean): void {
 // ---------------------------------------------------------------------------
 
 function injectPulseStyles(): void {
-  if (document.getElementById(ID_PULSE_STYLE)) return;
+  // Always re-inject to pick up brand color changes
+  const existing = document.getElementById(ID_PULSE_STYLE);
+  if (existing) existing.remove();
   const style = document.createElement('style');
   style.id = ID_PULSE_STYLE;
+  const rgb = getBrandRgb();
   style.textContent = `
     @keyframes mentro-pulse {
-      0%   { filter: drop-shadow(0 0 0px rgba(167,139,250,0.0)); }
-      50%  { filter: drop-shadow(0 0 8px rgba(167,139,250,0.9)); }
-      100% { filter: drop-shadow(0 0 0px rgba(167,139,250,0.0)); }
+      0%   { filter: drop-shadow(0 0 0px rgba(${rgb},0.0)); }
+      50%  { filter: drop-shadow(0 0 8px rgba(${rgb},0.9)); }
+      100% { filter: drop-shadow(0 0 0px rgba(${rgb},0.0)); }
     }
     #${ID_BADGE_SVG}.${CLASS_PULSE} {
       animation: mentro-pulse 1.2s ease-in-out infinite;
@@ -207,4 +211,27 @@ export function hideOverlay(): void {
     }, 200);
   }
   cancelPlusButtonPoll();
+}
+
+/**
+ * Rebuild the badge SVG in-place using the last known score and the current
+ * brand color. Does NOT re-score — only refreshes the visual theme.
+ */
+export function refreshBadgeTheme(): void {
+  const badge = document.getElementById(ID_BADGE) as HTMLElement | null;
+  if (!badge || !currentScore) return;
+
+  // Re-inject pulse styles with new brand color
+  injectPulseStyles();
+
+  // Rebuild the inner SVG
+  const oldSvg = badge.querySelector(`#${ID_BADGE_SVG}`);
+  if (oldSvg) oldSvg.remove();
+
+  const color = getScoreColor(currentScore.overall);
+  const { svg } = buildCircleSvg(currentScore.overall, color, 'mentro-badge');
+  svg.setAttribute('id', ID_BADGE_SVG);
+  svg.style.cssText = 'position:absolute;top:0;left:0;transition:filter 0.2s ease;';
+  svg.style.filter = `drop-shadow(0 2px 10px ${color}55)`;
+  badge.appendChild(svg);
 }

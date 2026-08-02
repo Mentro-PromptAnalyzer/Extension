@@ -110,3 +110,133 @@
   --m-shadow-brand-glow: 0 0 14px 1px rgba(var(--m-brand-rgb), 0.08);
   --m-shadow-danger-sm: 0 0 14px 1px rgba(var(--m-danger-rgb), 0.1);
 }
+
+/* ---------------------------------------------------------------------------
+ * Theme Overrides
+ * ---------------------------------------------------------------------------
+ */
+
+/* ── Midnight — cool blue accent ── */
+[data-theme="midnight"] {
+  --m-brand-rgb: 99, 148, 255;
+  --m-bg-primary: #0b0f1a;
+  --m-text-primary: #e2e8f5;
+  --m-text-white: #f0f4ff;
+  --m-text-90: rgba(226, 232, 245, 0.9);
+  --m-text-85: rgba(226, 232, 245, 0.85);
+  --m-text-80: rgba(226, 232, 245, 0.8);
+  --m-text-75: rgba(226, 232, 245, 0.75);
+  --m-text-65: rgba(226, 232, 245, 0.65);
+  --m-text-55: rgba(226, 232, 245, 0.55);
+  --m-text-45: rgba(226, 232, 245, 0.45);
+  --m-text-38: rgba(226, 232, 245, 0.38);
+  --m-text-35: rgba(226, 232, 245, 0.35);
+  --m-text-30: rgba(226, 232, 245, 0.3);
+  --m-text-28: rgba(226, 232, 245, 0.28);
+  --m-text-25: rgba(226, 232, 245, 0.25);
+  --m-text-22: rgba(226, 232, 245, 0.22);
+  --m-glass-border-top: rgba(99, 148, 255, 0.12);
+  --m-shadow-brand-sm: 0 0 10px 1px rgba(99, 148, 255, 0.18);
+  --m-shadow-brand-md: 0 0 16px 2px rgba(99, 148, 255, 0.15);
+  --m-shadow-brand-glow: 0 0 14px 1px rgba(99, 148, 255, 0.08);
+}
+
+/* ── Emerald — green/teal accent ── */
+[data-theme="emerald"] {
+  --m-brand-rgb: 52, 211, 153;
+  --m-bg-primary: #0a1210;
+  --m-text-primary: #e0f5ee;
+  --m-text-white: #f0fdf9;
+  --m-text-90: rgba(224, 245, 238, 0.9);
+  --m-text-85: rgba(224, 245, 238, 0.85);
+  --m-text-80: rgba(224, 245, 238, 0.8);
+  --m-text-75: rgba(224, 245, 238, 0.75);
+  --m-text-65: rgba(224, 245, 238, 0.65);
+  --m-text-55: rgba(224, 245, 238, 0.55);
+  --m-text-45: rgba(224, 245, 238, 0.45);
+  --m-text-38: rgba(224, 245, 238, 0.38);
+  --m-text-35: rgba(224, 245, 238, 0.35);
+  --m-text-30: rgba(224, 245, 238, 0.3);
+  --m-text-28: rgba(224, 245, 238, 0.28);
+  --m-text-25: rgba(224, 245, 238, 0.25);
+  --m-text-22: rgba(224, 245, 238, 0.22);
+  --m-glass-border-top: rgba(52, 211, 153, 0.12);
+  --m-shadow-brand-sm: 0 0 10px 1px rgba(52, 211, 153, 0.18);
+  --m-shadow-brand-md: 0 0 16px 2px rgba(52, 211, 153, 0.15);
+  --m-shadow-brand-glow: 0 0 14px 1px rgba(52, 211, 153, 0.08);
+}
+
+/* ── Rosé — pink accent ── */
+[data-theme="rose"] {
+  --m-brand-rgb: 244, 114, 182;
+  --m-bg-primary: #140b10;
+  --m-text-primary: #f5e0ec;
+  --m-text-white: #fdf0f7;
+  --m-text-90: rgba(245, 224, 236, 0.9);
+  --m-text-85: rgba(245, 224, 236, 0.85);
+  --m-text-80: rgba(245, 224, 236, 0.8);
+  --m-text-75: rgba(245, 224, 236, 0.75);
+  --m-text-65: rgba(245, 224, 236, 0.65);
+  --m-text-55: rgba(245, 224, 236, 0.55);
+  --m-text-45: rgba(245, 224, 236, 0.45);
+  --m-text-38: rgba(245, 224, 236, 0.38);
+  --m-text-35: rgba(245, 224, 236, 0.35);
+  --m-text-30: rgba(245, 224, 236, 0.3);
+  --m-text-28: rgba(245, 224, 236, 0.28);
+  --m-text-25: rgba(245, 224, 236, 0.25);
+  --m-text-22: rgba(245, 224, 236, 0.22);
+  --m-glass-border-top: rgba(244, 114, 182, 0.12);
+  --m-shadow-brand-sm: 0 0 10px 1px rgba(244, 114, 182, 0.18);
+  --m-shadow-brand-md: 0 0 16px 2px rgba(244, 114, 182, 0.15);
+  --m-shadow-brand-glow: 0 0 14px 1px rgba(244, 114, 182, 0.08);
+}
+
+/* ── Sunset — warm orange accent ── */
+[data-theme="sunset"] {
+  --m-brand-rgb: 251, 146, 60;
+  --m-bg-primary: #13100a;
+  --m-text-primary: #f5ebe0;
+  --m-text-white: #fdf6ee;
+  --m-text-90: rgba(245, 235, 224, 0.9);
+  --m-text-85: rgba(245, 235, 224, 0.85);
+  --m-text-80: rgba(245, 235, 224, 0.8);
+  --m-text-75: rgba(245, 235, 224, 0.75);
+  --m-text-65: rgba(245, 235, 224, 0.65);
+  --m-text-55: rgba(245, 235, 224, 0.55);
+  --m-text-45: rgba(245, 235, 224, 0.45);
+  --m-text-38: rgba(245, 235, 224, 0.38);
+  --m-text-35: rgba(245, 235, 224, 0.35);
+  --m-text-30: rgba(245, 235, 224, 0.3);
+  --m-text-28: rgba(245, 235, 224, 0.28);
+  --m-text-25: rgba(245, 235, 224, 0.25);
+  --m-text-22: rgba(245, 235, 224, 0.22);
+  --m-glass-border-top: rgba(251, 146, 60, 0.12);
+  --m-shadow-brand-sm: 0 0 10px 1px rgba(251, 146, 60, 0.18);
+  --m-shadow-brand-md: 0 0 16px 2px rgba(251, 146, 60, 0.15);
+  --m-shadow-brand-glow: 0 0 14px 1px rgba(251, 146, 60, 0.08);
+}
+
+/* ── Nord — muted teal/frost accent ── */
+[data-theme="nord"] {
+  --m-brand-rgb: 136, 192, 208;
+  --m-bg-primary: #1a1e26;
+  --m-text-primary: #d8dee9;
+  --m-text-white: #eceff4;
+  --m-text-90: rgba(216, 222, 233, 0.9);
+  --m-text-85: rgba(216, 222, 233, 0.85);
+  --m-text-80: rgba(216, 222, 233, 0.8);
+  --m-text-75: rgba(216, 222, 233, 0.75);
+  --m-text-65: rgba(216, 222, 233, 0.65);
+  --m-text-55: rgba(216, 222, 233, 0.55);
+  --m-text-45: rgba(216, 222, 233, 0.45);
+  --m-text-38: rgba(216, 222, 233, 0.38);
+  --m-text-35: rgba(216, 222, 233, 0.35);
+  --m-text-30: rgba(216, 222, 233, 0.3);
+  --m-text-28: rgba(216, 222, 233, 0.28);
+  --m-text-25: rgba(216, 222, 233, 0.25);
+  --m-text-22: rgba(216, 222, 233, 0.22);
+  --m-glass-border-top: rgba(136, 192, 208, 0.12);
+  --m-shadow-brand-sm: 0 0 10px 1px rgba(136, 192, 208, 0.18);
+  --m-shadow-brand-md: 0 0 16px 2px rgba(136, 192, 208, 0.15);
+  --m-shadow-brand-glow: 0 0 14px 1px rgba(136, 192, 208, 0.08);
+}

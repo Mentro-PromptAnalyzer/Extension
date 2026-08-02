@@ -125,7 +125,7 @@ describe('saveSettings', () => {
   });
 
   it('round-trips through loadSettings after saving', async () => {
-    const settings = { pillsEnabled: false, badgeEnabled: false, statsEnabled: false, detailedMetricsEnabled: false };
+    const settings = { pillsEnabled: false, badgeEnabled: false, statsEnabled: false, detailedMetricsEnabled: false, theme: 'dark' as const };
     saveSettings(settings);
     const loaded = await loadSettings();
     expect(loaded).toEqual(settings);

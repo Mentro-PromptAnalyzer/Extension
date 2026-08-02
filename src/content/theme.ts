@@ -5,22 +5,60 @@
 // Instead we export TS constants that the overlay modules interpolate into
 // inline styles and injected <style> blocks.
 //
-// To support future theming, swap the values in this file or load them
-// dynamically from chrome.storage.
+// Brand color is dynamic — controlled by the user's theme selection stored in
+// chrome.storage.sync. Call `setThemeBrand(rgb)` to change it at runtime.
 // ---------------------------------------------------------------------------
 
-// ── Brand ──
-export const BRAND = 'rgba(167,139,250,1)';
-export const BRAND_90 = 'rgba(167,139,250,0.9)';
-export const BRAND_55 = 'rgba(167,139,250,0.55)';
-export const BRAND_45 = 'rgba(167,139,250,0.45)';
-export const BRAND_35 = 'rgba(167,139,250,0.35)';
-export const BRAND_30 = 'rgba(167,139,250,0.30)';
-export const BRAND_20 = 'rgba(167,139,250,0.20)';
-export const BRAND_18 = 'rgba(167,139,250,0.18)';
-export const BRAND_12 = 'rgba(167,139,250,0.12)';
-export const BRAND_10 = 'rgba(167,139,250,0.10)';
-export const BRAND_04 = 'rgba(167,139,250,0.04)';
+// ── Theme brand RGB — default purple, overwritten on init / settings update ──
+let _brandRgb = '167,139,250';
+
+export function setThemeBrand(rgb: string): void {
+  _brandRgb = rgb;
+}
+
+export function getBrandRgb(): string {
+  return _brandRgb;
+}
+
+// ── Brand (dynamic) ──
+export function brand(alpha = 1): string {
+  return `rgba(${_brandRgb},${alpha})`;
+}
+
+// For template literal usage modules should call the getter functions.
+export function getBrand(): string {
+  return `rgba(${_brandRgb},1)`;
+}
+export function getBrand90(): string {
+  return `rgba(${_brandRgb},0.9)`;
+}
+export function getBrand55(): string {
+  return `rgba(${_brandRgb},0.55)`;
+}
+export function getBrand45(): string {
+  return `rgba(${_brandRgb},0.45)`;
+}
+export function getBrand35(): string {
+  return `rgba(${_brandRgb},0.35)`;
+}
+export function getBrand30(): string {
+  return `rgba(${_brandRgb},0.30)`;
+}
+export function getBrand20(): string {
+  return `rgba(${_brandRgb},0.20)`;
+}
+export function getBrand18(): string {
+  return `rgba(${_brandRgb},0.18)`;
+}
+export function getBrand12(): string {
+  return `rgba(${_brandRgb},0.12)`;
+}
+export function getBrand10(): string {
+  return `rgba(${_brandRgb},0.10)`;
+}
+export function getBrand04(): string {
+  return `rgba(${_brandRgb},0.04)`;
+}
 
 // ── Score colors ──
 export const SCORE_GOOD = '#4ade80';
@@ -49,8 +87,12 @@ export const GLASS_GRAD_ID = 'mentro-glass-grad';
 
 // ── Shadows ──
 export const SHADOW_CARD = '0 4px 16px rgba(0,0,0,0.18)';
-export const SHADOW_BRAND_INSET = 'inset 0 1px 0 rgba(167,139,250,0.12)';
-export const SHADOW_BRAND_INSET_STRONG = 'inset 0 1px 0 rgba(167,139,250,0.18)';
+export function getShadowBrandInset(): string {
+  return `inset 0 1px 0 rgba(${_brandRgb},0.12)`;
+}
+export function getShadowBrandInsetStrong(): string {
+  return `inset 0 1px 0 rgba(${_brandRgb},0.18)`;
+}
 
 // ── Typography ──
 export const FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -82,3 +124,17 @@ export const ID_BUBBLE_STYLE = 'mentro-bubble-style';
 
 // ── Dimension labels ──
 export const DIMENSION_LABELS = ['Ownership', 'Depth', 'Critical', 'Clarity'] as const;
+
+// ── Theme brand lookup table (must match popup/themes.ts) ──
+const THEME_BRAND_MAP: Record<string, string> = {
+  dark: '167,139,250',
+  midnight: '99,148,255',
+  emerald: '52,211,153',
+  rose: '244,114,182',
+  sunset: '251,146,60',
+  nord: '136,192,208',
+};
+
+export function themeIdToBrandRgb(themeId: string): string {
+  return THEME_BRAND_MAP[themeId] ?? THEME_BRAND_MAP['dark'];
+}

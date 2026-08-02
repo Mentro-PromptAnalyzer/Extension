@@ -3,6 +3,7 @@ import { SettingsTab } from './SettingsTab';
 import { AccountTab } from './AccountTab';
 import { AuthSession, getValidSession } from '../auth';
 import { Settings, loadSettings, DEFAULT_SETTINGS } from '../settings';
+import { applyTheme } from '../themes';
 
 type Tab = 'settings' | 'account';
 type Platform = 'chatgpt' | 'gemini' | 'perplexity' | 'claude' | 'inactive';
@@ -93,6 +94,11 @@ export function App() {
 
   const isSignedIn = session !== null;
 
+  function handleSettingsChange(next: Settings) {
+    setSettings(next);
+    applyTheme(next.theme);
+  }
+
   // When the user signs out, snap back to the account tab so they
   // don't end up on Settings/Tips with a stale signed-in-only view.
   useEffect(() => {
@@ -109,6 +115,7 @@ export function App() {
         clearTimeout(timeout);
         setSession(s);
         setSettings(st);
+        applyTheme(st.theme);
         setReady(true);
       })
       .catch((err: unknown) => {
@@ -144,7 +151,7 @@ export function App() {
       </div>
 
       {ready ? (
-        <>
+        <div className="tab-scroll">
           <div className={`tab-panel${activeTab === 'account' ? ' active' : ''}`}>
             <AccountTab
               session={session}
@@ -157,14 +164,16 @@ export function App() {
           <div className={`tab-panel${activeTab === 'settings' ? ' active' : ''}`}>
             <SettingsTab
               settings={settings}
-              onSettingsChange={setSettings}
+              onSettingsChange={handleSettingsChange}
               session={session}
               onDeleteDone={() => setStatsReloadKey((k) => k + 1)}
             />
           </div>
-        </>
+        </div>
       ) : (
-        <div className="tab-panel active" />
+        <div className="tab-scroll">
+          <div className="tab-panel active" />
+        </div>
       )}
     </>
   );

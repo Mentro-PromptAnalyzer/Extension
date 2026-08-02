@@ -2,11 +2,14 @@
 // Settings — chrome.storage.sync persistence + broadcast to content scripts
 // ---------------------------------------------------------------------------
 
+export type ThemeId = 'dark' | 'midnight' | 'emerald' | 'rose' | 'sunset' | 'nord';
+
 export interface Settings {
   pillsEnabled: boolean;
   badgeEnabled: boolean;
   statsEnabled: boolean;
   detailedMetricsEnabled: boolean;
+  theme: ThemeId;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -14,6 +17,7 @@ export const DEFAULT_SETTINGS: Settings = {
   badgeEnabled: true,
   statsEnabled: true,
   detailedMetricsEnabled: false,
+  theme: 'dark',
 };
 
 export async function loadSettings(): Promise<Settings> {

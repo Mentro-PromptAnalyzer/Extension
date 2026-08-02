@@ -15,7 +15,7 @@ import {
   ID_BUBBLE_STYLE,
   DIMENSION_LABELS,
   FONT_FAMILY,
-  BRAND_90,
+  getBrand90,
   getScoreColor,
 } from './theme';
 import { buildCircleSvg, injectGlassDefs } from './dom-utils';
@@ -46,7 +46,9 @@ export function isBubblesVisible(): boolean {
 // ---------------------------------------------------------------------------
 
 function injectBubbleStyles(): void {
-  if (document.getElementById(ID_BUBBLE_STYLE)) return;
+  // Always re-inject to pick up brand color changes
+  const existing = document.getElementById(ID_BUBBLE_STYLE);
+  if (existing) existing.remove();
   const style = document.createElement('style');
   style.id = ID_BUBBLE_STYLE;
   style.textContent = `
@@ -80,7 +82,7 @@ function injectBubbleStyles(): void {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.07em;
-      color: ${BRAND_90};
+      color: ${getBrand90()};
       white-space: nowrap;
       pointer-events: none;
       width: max-content;
@@ -163,7 +165,7 @@ export function showBubbles(badge: HTMLElement): void {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.07em;
-      color: ${BRAND_90};
+      color: ${getBrand90()};
       white-space: nowrap;
       pointer-events: none;
       z-index: ${Z_BADGE};

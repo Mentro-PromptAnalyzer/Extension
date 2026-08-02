@@ -11,6 +11,7 @@ import {
   ID_GLASS_DEFS,
   GLASS_GRAD_ID,
   Z_BADGE,
+  getBrandRgb,
 } from './theme';
 
 // ---------------------------------------------------------------------------
@@ -106,14 +107,14 @@ export function buildCircleSvg(
   }) as SVGCircleElement;
   svg.appendChild(glassBg);
 
-  // Purple inner ring accent
+  // Inner ring accent (theme-aware)
   svg.appendChild(
     svgEl('circle', {
       cx,
       cy,
       r: String(INNER_R + 3),
       fill: 'none',
-      stroke: 'rgba(167,139,250,0.18)',
+      stroke: `rgba(${getBrandRgb()},0.18)`,
       'stroke-width': '1.5',
     })
   );
@@ -135,7 +136,7 @@ export function buildCircleSvg(
       cy,
       r: String(RING_R),
       fill: 'none',
-      stroke: 'rgba(167,139,250,0.20)',
+      stroke: `rgba(${getBrandRgb()},0.20)`,
       'stroke-width': String(RING_STROKE),
     })
   );

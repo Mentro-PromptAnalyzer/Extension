@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, DEFAULT_SETTINGS, saveSettings } from '../settings';
 import { AuthSession, deleteAllPrompts, getValidSession } from '../auth';
+import { THEMES } from '../themes';
 
 interface Props {
   settings: Settings;
@@ -212,6 +213,34 @@ export function SettingsTab({ settings, onSettingsChange, session, onDeleteDone 
           </label>
         </div>
       )}
+
+      <div className="settings-gap" />
+      <div className="settings-gap" />
+
+      <div className="theme-section">
+        <div className="setting-label" style={{ marginBottom: '8px' }}>
+          Theme
+        </div>
+        <div className="theme-grid">
+          {THEMES.map((theme) => (
+            <button
+              key={theme.id}
+              className={`theme-swatch${settings.theme === theme.id ? ' active' : ''}`}
+              onClick={() => persist({ ...settings, theme: theme.id })}
+              aria-label={`${theme.label} theme`}
+              title={theme.label}
+            >
+              <span className="theme-swatch-color" style={{ background: theme.bgPrimary }}>
+                <span
+                  className="theme-swatch-accent"
+                  style={{ background: `rgb(${theme.brandRgb})` }}
+                />
+              </span>
+              <span className="theme-swatch-label">{theme.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="settings-gap" />
       <div className="settings-gap" />
