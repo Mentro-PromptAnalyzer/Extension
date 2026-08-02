@@ -262,7 +262,7 @@ export async function fetchLifetimeStats(
 ): Promise<{ ok: true; stats: LifetimeStats } | { ok: false }> {
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/extension_prompts` +
+      `${SUPABASE_URL}/rest/v1/prompt_scores` +
         `?select=word_count,score_overall,score_ownership,score_depth,score_critical,score_clarity,intent,platform,created_at` +
         `&order=created_at.desc`,
       {
@@ -314,7 +314,7 @@ export async function deleteAllPrompts(
     if (!userId) return { ok: false, error: 'Could not read user ID from token.' };
 
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/extension_prompts?user_id=eq.${encodeURIComponent(userId)}`,
+      `${SUPABASE_URL}/rest/v1/prompt_scores?user_id=eq.${encodeURIComponent(userId)}`,
       {
         method: 'DELETE',
         headers: {

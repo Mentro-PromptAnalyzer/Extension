@@ -74,7 +74,7 @@ export async function insertPromptRow(
   };
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/extension_prompts`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/prompt_scores`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
