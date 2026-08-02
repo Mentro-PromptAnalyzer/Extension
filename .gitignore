@@ -34,5 +34,8 @@ npm-debug.log*
 # Test coverage reports
 coverage/
 
+# Playwright HTML report
+playwright-report/
+
 # CWS submission zip
 *.zip
