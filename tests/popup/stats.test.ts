@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
 import { derivePlatform } from '../../src/background/index';
-import { aggregateStats } from '../../src/popup/auth';
+import { aggregateStats, getLinkedProviders } from '../../src/popup/auth';
 import { computeTopIntent } from '../../src/popup/components/AccountTab';
 
 // ===========================================================================
@@ -323,5 +323,38 @@ describe('Property-based tests', () => {
       }),
       { numRuns: 100 }
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLinkedProviders
+// ---------------------------------------------------------------------------
+
+describe('getLinkedProviders', () => {
+  it('returns an empty set for an empty identities array', () => {
+    expect(getLinkedProviders([])).toEqual(new Set());
+  });
+
+  it('returns a set with one provider for a single identity', () => {
+    const identities = [{ id: '1', provider: 'google' }];
+    expect(getLinkedProviders(identities)).toEqual(new Set(['google']));
+  });
+
+  it('returns unique providers when multiple identities exist', () => {
+    const identities = [
+      { id: '1', provider: 'google' },
+      { id: '2', provider: 'github' },
+    ];
+    expect(getLinkedProviders(identities)).toEqual(new Set(['google', 'github']));
+  });
+
+  it('deduplicates multiple identities from the same provider', () => {
+    const identities = [
+      { id: '1', provider: 'google' },
+      { id: '2', provider: 'google' },
+    ];
+    const result = getLinkedProviders(identities);
+    expect(result.size).toBe(1);
+    expect(result.has('google')).toBe(true);
   });
 });

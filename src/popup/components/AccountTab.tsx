@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AuthSession,
   saveSession,
-  signInWithPassword,
   signInWithOAuth,
   signOut,
   fetchLifetimeStats,
+  fetchUserIdentities,
+  getLinkedProviders,
   getValidSession,
   LifetimeStats,
 } from '../auth';
@@ -52,6 +53,63 @@ function GitHubIcon() {
     </svg>
   );
 }
+
+function CheckIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className="account-check-icon"
+    >
+      <path
+        d="M20 6L9 17l-5-5"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function AppleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.52-3.23 0-1.44.64-2.2.46-3.06-.4C3.79 16.17 4.36 9.83 8.73 9.6c1.23.06 2.08.72 2.8.75.99-.2 1.93-.78 2.98-.7 1.27.1 2.23.6 2.84 1.53-2.6 1.56-1.98 4.98.42 5.93-.5 1.3-1.15 2.58-2.72 3.17zM12.03 9.54c-.14-2.4 1.82-4.38 4.05-4.54.28 2.6-2.36 4.7-4.05 4.54z" />
+    </svg>
+  );
+}
+
+function MicrosoftIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="1" y="1" width="10" height="10" fill="#F25022" />
+      <rect x="13" y="1" width="10" height="10" fill="#7FBA00" />
+      <rect x="1" y="13" width="10" height="10" fill="#00A4EF" />
+      <rect x="13" y="13" width="10" height="10" fill="#FFB900" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Provider config — centralised list of supported OAuth providers
+// ---------------------------------------------------------------------------
+
+type OAuthProvider = 'google' | 'github';
+
+interface ProviderInfo {
+  id: OAuthProvider;
+  label: string;
+  Icon: () => React.JSX.Element;
+}
+
+const PROVIDERS: ProviderInfo[] = [
+  { id: 'google', label: 'Google', Icon: GoogleIcon },
+  { id: 'github', label: 'GitHub', Icon: GitHubIcon },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -255,7 +313,9 @@ function SignedInView({
   statsError,
   statsEnabled,
   isActive,
+  linkedProviders,
   onSignOut,
+  onLinkOAuth,
   onReload,
 }: {
   session: AuthSession;
@@ -264,14 +324,21 @@ function SignedInView({
   statsError: boolean;
   statsEnabled: boolean;
   isActive: boolean;
+  linkedProviders: Set<string>;
   onSignOut: () => void;
+  onLinkOAuth: (provider: OAuthProvider) => void;
   onReload: () => void;
 }) {
   const [detail, setDetail] = useState<DetailKey | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [linkingProvider, setLinkingProvider] = useState<OAuthProvider | null>(null);
 
   // Reset detail panel when the user switches away from the Account tab
   useEffect(() => {
-    if (!isActive) setDetail(null);
+    if (!isActive) {
+      setDetail(null);
+      setOptionsOpen(false);
+    }
   }, [isActive]);
 
   const detailTitles: Record<DetailKey, string> = {
@@ -283,10 +350,73 @@ function SignedInView({
 
   return (
     <div className="account-signed-in">
-      <div className="account-user-card">
+      <button
+        className={`account-user-card${optionsOpen ? ' expanded' : ''}`}
+        onClick={() => setOptionsOpen((o) => !o)}
+        aria-expanded={optionsOpen}
+      >
         <div className="account-avatar">{session.email[0] ?? '?'}</div>
         <span className="account-email">{session.email}</span>
-      </div>
+        <svg
+          className={`account-card-caret${optionsOpen ? ' open' : ''}`}
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M3 4.5L6 7.5L9 4.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      {optionsOpen && (
+        <div className="account-options">
+          {PROVIDERS.map(({ id, label, Icon }) => {
+            const isLinked = linkedProviders.has(id);
+            return (
+              <button
+                key={id}
+                className={`account-option-btn${isLinked ? ' linked' : ''}`}
+                onClick={() => {
+                  if (isLinked) return;
+                  setLinkingProvider(id);
+                  onLinkOAuth(id);
+                }}
+                disabled={isLinked || linkingProvider !== null}
+              >
+                <Icon />
+                <span>
+                  {isLinked
+                    ? `${label} linked`
+                    : linkingProvider === id
+                      ? 'Opening…'
+                      : `Link ${label}`}
+                </span>
+                {isLinked && <CheckIcon />}
+              </button>
+            );
+          })}
+          <div className="account-options-divider" />
+          <button className="account-option-btn danger" onClick={onSignOut}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Sign out</span>
+          </button>
+        </div>
+      )}
 
       {statsLoading && <div className="stats-loading">Loading stats…</div>}
 
@@ -356,10 +486,6 @@ function SignedInView({
           {detail === 'platform' && <PlatformDetail stats={stats} />}
         </div>
       )}
-
-      <button className="signout-btn" onClick={onSignOut}>
-        Sign out
-      </button>
     </div>
   );
 }
@@ -369,17 +495,12 @@ function SignedInView({
 // ---------------------------------------------------------------------------
 
 export function AccountTab({ session, onSessionChange, statsEnabled, isActive, reloadKey }: Props) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loadingPassword, setLoadingPassword] = useState(false);
-  const [loadingOAuth, setLoadingOAuth] = useState<'google' | 'github' | null>(null);
+  const [loadingOAuth, setLoadingOAuth] = useState<OAuthProvider | null>(null);
   const [stats, setStats] = useState<LifetimeStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(false);
-  const passwordRef = useRef<HTMLInputElement>(null);
-
-  const anyLoading = loadingPassword || loadingOAuth !== null;
+  const [linkedProviders, setLinkedProviders] = useState<Set<string>>(new Set());
 
   async function loadStats(token: string) {
     setStatsLoading(true);
@@ -393,23 +514,27 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
     setStatsLoading(false);
   }
 
-  // Silent background refresh — no loading spinner, no error state change.
-  // Only updates stats if the fetch succeeds so a transient network hiccup
-  // doesn't wipe out the currently displayed data.
   async function refreshStatsSilently(token: string) {
     const result = await fetchLifetimeStats(token);
     if (result.ok) setStats(result.stats);
   }
 
+  async function loadIdentities(token: string) {
+    const result = await fetchUserIdentities(token);
+    if (result.ok) {
+      setLinkedProviders(getLinkedProviders(result.identities));
+    }
+  }
+
   useEffect(() => {
     if (!session) {
       setStats(null);
+      setLinkedProviders(new Set());
       return;
     }
 
     let token: string | null = null;
 
-    // Initial load (with loading spinner + error state)
     getValidSession()
       .then((validSession) => {
         if (!validSession) return Promise.reject(new Error('no session'));
@@ -417,11 +542,11 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
           onSessionChange(validSession);
         }
         token = validSession.access_token;
+        void loadIdentities(token);
         return loadStats(token);
       })
       .catch(() => setStatsError(true));
 
-    // Poll every 10 s while the popup is open
     const interval = setInterval(() => {
       if (token) void refreshStatsSilently(token);
     }, 10_000);
@@ -429,29 +554,7 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
     return () => clearInterval(interval);
   }, [session, reloadKey]);
 
-  async function handlePasswordSignIn() {
-    setError('');
-    if (!email) {
-      setError('Please enter your email.');
-      return;
-    }
-    if (!password) {
-      setError('Please enter your password.');
-      return;
-    }
-    setLoadingPassword(true);
-    const result = await signInWithPassword(email, password);
-    setLoadingPassword(false);
-    if ('error' in result) {
-      setError(result.error);
-      return;
-    }
-    setPassword('');
-    saveSession(result.session);
-    onSessionChange(result.session);
-  }
-
-  async function handleOAuth(provider: 'google' | 'github') {
+  async function handleOAuth(provider: OAuthProvider) {
     setError('');
     setLoadingOAuth(provider);
     const result = await signInWithOAuth(provider);
@@ -460,8 +563,19 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
       if (result.error) setError(result.error);
       return;
     }
-    // Background worker already persisted the session — just update UI state
     onSessionChange(result.session);
+  }
+
+  async function handleLinkOAuth(provider: OAuthProvider) {
+    // For linking, we use the same OAuth flow — Supabase auto-links
+    // identities with the same email to the existing user.
+    const result = await signInWithOAuth(provider);
+    if ('error' in result) return;
+    // Refresh identities after linking
+    const validSession = await getValidSession();
+    if (validSession) {
+      void loadIdentities(validSession.access_token);
+    }
   }
 
   async function handleSignOut() {
@@ -479,7 +593,9 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
         statsError={statsError}
         statsEnabled={statsEnabled}
         isActive={isActive}
+        linkedProviders={linkedProviders}
         onSignOut={handleSignOut}
+        onLinkOAuth={handleLinkOAuth}
         onReload={() => {
           getValidSession().then((validSession) => {
             if (validSession) loadStats(validSession.access_token);
@@ -491,43 +607,11 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
 
   return (
     <div className="auth-form">
-      <div className="auth-field">
-        <label className="auth-label" htmlFor="auth-email">
-          Email
-        </label>
-        <input
-          className="auth-input"
-          id="auth-email"
-          type="email"
-          placeholder="you@example.com"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') passwordRef.current?.focus();
-          }}
-          disabled={anyLoading}
-        />
-      </div>
-
-      <div className="auth-field">
-        <label className="auth-label" htmlFor="auth-password">
-          Password
-        </label>
-        <input
-          className="auth-input"
-          id="auth-password"
-          type="password"
-          placeholder="••••••••"
-          autoComplete="current-password"
-          value={password}
-          ref={passwordRef}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handlePasswordSignIn();
-          }}
-          disabled={anyLoading}
-        />
+      <div className="auth-welcome">
+        <h2 className="auth-welcome-title">Welcome to Mentro</h2>
+        <p className="auth-welcome-desc">
+          Sign in to track your prompts and get personalised tips.
+        </p>
       </div>
 
       {error && (
@@ -536,25 +620,17 @@ export function AccountTab({ session, onSessionChange, statsEnabled, isActive, r
         </div>
       )}
 
-      <button className="auth-btn" onClick={handlePasswordSignIn} disabled={anyLoading}>
-        {loadingPassword ? 'Signing in…' : 'Sign in'}
-      </button>
-
-      <div className="auth-divider">
-        <span className="auth-divider-line" />
-        <span className="auth-divider-text">or</span>
-        <span className="auth-divider-line" />
-      </div>
-
-      <button className="oauth-btn" onClick={() => handleOAuth('google')} disabled={anyLoading}>
-        <GoogleIcon />
-        <span>{loadingOAuth === 'google' ? 'Opening…' : 'Continue with Google'}</span>
-      </button>
-
-      <button className="oauth-btn" onClick={() => handleOAuth('github')} disabled={anyLoading}>
-        <GitHubIcon />
-        <span>{loadingOAuth === 'github' ? 'Opening…' : 'Continue with GitHub'}</span>
-      </button>
+      {PROVIDERS.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          className="oauth-btn"
+          onClick={() => handleOAuth(id)}
+          disabled={loadingOAuth !== null}
+        >
+          <Icon />
+          <span>{loadingOAuth === id ? 'Opening…' : `Continue with ${label}`}</span>
+        </button>
+      ))}
     </div>
   );
 }
