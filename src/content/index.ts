@@ -13,6 +13,7 @@ import {
   renderLoginPrompt,
   hideFeedback,
   attachInputBarHover,
+  setDetailedMetricsEnabled,
 } from './overlay';
 import { scoreWithAI } from '../analysis/ai';
 import { extractTopicsTFIDF } from '../analysis/tfidf';
@@ -467,12 +468,14 @@ document.addEventListener('visibilitychange', () => {
 interface ContentSettings {
   pillsEnabled: boolean;
   badgeEnabled: boolean;
+  detailedMetricsEnabled: boolean;
 }
 
 // Active settings — applied immediately when received
 let contentSettings: ContentSettings = {
   pillsEnabled: true,
   badgeEnabled: true,
+  detailedMetricsEnabled: false,
 };
 
 // Load persisted settings on startup and apply them
@@ -493,6 +496,9 @@ function applySettings(settings: Partial<ContentSettings>): void {
   const prevPills = contentSettings.pillsEnabled;
 
   contentSettings = { ...contentSettings, ...settings };
+
+  // Forward detailed metrics toggle to the overlay module
+  setDetailedMetricsEnabled(contentSettings.detailedMetricsEnabled);
 
   // Badge toggled off → hide immediately
   if (prevBadge && !contentSettings.badgeEnabled) {
