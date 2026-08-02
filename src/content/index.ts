@@ -14,9 +14,11 @@ import {
   hideFeedback,
   attachInputBarHover,
   setDetailedMetricsEnabled,
+  refreshBadgeTheme,
 } from './overlay';
 import { scoreWithAI } from '../analysis/ai';
 import { extractTopicsTFIDF } from '../analysis/tfidf';
+import { setThemeBrand, themeIdToBrandRgb } from './theme';
 import type { HeuristicContext } from '../analysis/ai';
 import type { LiveScore } from '../analysis/engine';
 
@@ -212,7 +214,11 @@ function safeSendMessage(message: object): void {
 // Core scoring flow
 // ---------------------------------------------------------------------------
 
-function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatform>): void {
+function onInputChange(
+  el: HTMLElement,
+  platform: ReturnType<typeof detectPlatform>,
+  heuristicOnly = false
+): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   if (aiTimer) clearTimeout(aiTimer);
 
@@ -252,6 +258,10 @@ function onInputChange(el: HTMLElement, platform: ReturnType<typeof detectPlatfo
       renderOverlay(displayScore, el, platform ?? undefined);
     }
     safeSendMessage({ type: 'SCORE_UPDATE', score: displayScore });
+
+    // Skip AI scoring when heuristicOnly — used for initial page load scoring
+    // where text was already present (no user input triggered this).
+    if (heuristicOnly) return;
 
     // Show login CTA pill for unauthenticated users — skip AI scoring path.
     if (!isLoggedIn && contentSettings.pillsEnabled) {
@@ -354,8 +364,9 @@ function attachToInput(input: HTMLElement, platform: ReturnType<typeof detectPla
   }
   activeInput = input;
 
-  // Score immediately — text may already be present
-  onInputChange(input, platform);
+  // Score immediately — text may already be present (heuristic only on first
+  // attach so we don't fire an AI request just because the page loaded)
+  onInputChange(input, platform, true);
 
   // Attach hover listeners to the input bar for pill reveal
   attachInputBarHover(input, platform ?? undefined);
@@ -445,7 +456,7 @@ const navObserver = new MutationObserver(() => {
       const platform = detectPlatform();
       if (!platform) return;
       const input = findInputElement(platform);
-      if (input) onInputChange(input, platform);
+      if (input) onInputChange(input, platform, true);
     }, 800);
   }
 });
@@ -457,7 +468,7 @@ navObserver.observe(document.body, { childList: true, subtree: true });
 
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && activeInput) {
-    onInputChange(activeInput, detectPlatform());
+    onInputChange(activeInput, detectPlatform(), true);
   }
 });
 
@@ -481,7 +492,12 @@ let contentSettings: ContentSettings = {
 // Load persisted settings on startup and apply them
 chrome.storage.sync.get('mentro_settings', (result) => {
   if (result['mentro_settings']) {
-    applySettings(result['mentro_settings'] as Partial<ContentSettings>);
+    const saved = result['mentro_settings'] as Record<string, unknown>;
+    applySettings(saved as Partial<ContentSettings>);
+    // Apply theme brand from stored settings
+    if (typeof saved['theme'] === 'string') {
+      setThemeBrand(themeIdToBrandRgb(saved['theme']));
+    }
   }
 });
 
@@ -491,11 +507,17 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
-function applySettings(settings: Partial<ContentSettings>): void {
+function applySettings(settings: Partial<ContentSettings & { theme?: string }>): void {
   const prevBadge = contentSettings.badgeEnabled;
   const prevPills = contentSettings.pillsEnabled;
+  const themeChanged = !!settings.theme;
 
   contentSettings = { ...contentSettings, ...settings };
+
+  // Apply theme brand color if theme field is present
+  if (settings.theme) {
+    setThemeBrand(themeIdToBrandRgb(settings.theme));
+  }
 
   // Forward detailed metrics toggle to the overlay module
   setDetailedMetricsEnabled(contentSettings.detailedMetricsEnabled);
@@ -504,9 +526,14 @@ function applySettings(settings: Partial<ContentSettings>): void {
   if (prevBadge && !contentSettings.badgeEnabled) {
     hideOverlay();
   }
-  // Badge toggled on → re-score to show it
+  // Badge toggled on → re-score to show it (heuristic only)
   if (!prevBadge && contentSettings.badgeEnabled && activeInput) {
-    onInputChange(activeInput, detectPlatform());
+    onInputChange(activeInput, detectPlatform(), true);
+  }
+
+  // Theme changed while badge is visible → just rebuild the SVG visuals, no re-score
+  if (themeChanged && contentSettings.badgeEnabled) {
+    refreshBadgeTheme();
   }
 
   // Pills toggled off → clear immediately

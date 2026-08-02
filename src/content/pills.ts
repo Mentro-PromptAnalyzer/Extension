@@ -13,14 +13,13 @@ import {
   FONT_FAMILY,
   GLASS_BG,
   GLASS_BLUR,
-  BRAND,
-  BRAND_45,
-  BRAND_35,
-  BRAND_30,
-  BRAND_18,
-  BRAND_12,
-  BRAND_04,
-  BRAND_10,
+  getBrand,
+  getBrand45,
+  getBrand35,
+  getBrand18,
+  getBrand12,
+  getBrand04,
+  getBrand10,
   PILL_GREEN,
   PILL_GREEN_GLOW,
   PILL_GREEN_BORDER,
@@ -28,8 +27,7 @@ import {
   PILL_RED_GLOW,
   PILL_RED_BORDER,
   SHADOW_CARD,
-  SHADOW_BRAND_INSET,
-  SHADOW_BRAND_INSET_STRONG,
+  getShadowBrandInsetStrong,
 } from './theme';
 import { findInputBar } from './dom-utils';
 
@@ -125,7 +123,7 @@ function createPillElement(
     max-width: ${Math.min(rect.width - 24, 520)}px;
     background: ${GLASS_BG};
     border: 1px solid ${borderColor};
-    border-top: 1px solid ${BRAND_30};
+    border-top: 1px solid ${borderColor};
     border-radius: 20px;
     padding: 7px 14px 7px 10px;
     display: flex;
@@ -135,7 +133,7 @@ function createPillElement(
     font-size: 12px;
     font-weight: 500;
     color: ${color};
-    box-shadow: 0 0 20px 3px ${glowColor}, 0 0 8px 1px ${BRAND_10}, ${SHADOW_CARD}, ${SHADOW_BRAND_INSET};
+    box-shadow: 0 0 20px 3px ${glowColor}, ${SHADOW_CARD};
     z-index: ${Z_BADGE + 10 + index};
     pointer-events: auto;
     animation-delay: ${index * 60}ms;
@@ -185,9 +183,9 @@ function showLoginPill(rect: DOMRect, nudgeY = 0): void {
     left: ${rect.left + 12}px;
     top: ${rect.top - 44 + nudgeY}px;
     max-width: ${Math.min(rect.width - 24, 520)}px;
-    background: linear-gradient(135deg, ${BRAND_12} 0%, ${BRAND_04} 100%);
-    border: 1px solid ${BRAND_35};
-    border-top: 1px solid ${BRAND_45};
+    background: linear-gradient(135deg, ${getBrand12()} 0%, ${getBrand04()} 100%);
+    border: 1px solid ${getBrand35()};
+    border-top: 1px solid ${getBrand45()};
     border-radius: 20px;
     padding: 7px 14px 7px 10px;
     display: flex;
@@ -196,8 +194,8 @@ function showLoginPill(rect: DOMRect, nudgeY = 0): void {
     font-family: ${FONT_FAMILY};
     font-size: 12px;
     font-weight: 500;
-    color: ${BRAND};
-    box-shadow: 0 0 20px 3px ${BRAND_18}, 0 0 8px 1px ${BRAND_10}, ${SHADOW_CARD}, ${SHADOW_BRAND_INSET_STRONG};
+    color: ${getBrand()};
+    box-shadow: 0 0 20px 3px ${getBrand18()}, 0 0 8px 1px ${getBrand10()}, ${SHADOW_CARD}, ${getShadowBrandInsetStrong()};
     z-index: ${Z_BADGE + 10};
     pointer-events: auto;
     animation: mentro-fly-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
