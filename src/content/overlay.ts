@@ -42,6 +42,7 @@ let detailedMetricsEnabled = false;
 /** Called by the content script when settings load or change. */
 export function setDetailedMetricsEnabled(enabled: boolean): void {
   detailedMetricsEnabled = enabled;
+  if (!enabled) hideBubbles();
 }
 
 let currentScore: LiveScore | null = null;
