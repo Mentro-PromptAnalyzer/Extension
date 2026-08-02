@@ -108,8 +108,41 @@ export async function getValidSession(): Promise<AuthSession | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Sign out
+// Email / password
 // ---------------------------------------------------------------------------
+
+export async function signInWithPassword(
+  email: string,
+  password: string
+): Promise<{ session: AuthSession } | { error: string }> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = (await res.json()) as {
+      access_token?: string;
+      refresh_token?: string;
+      user?: { email?: string };
+      error_description?: string;
+      msg?: string;
+    };
+    if (!res.ok || !data.access_token) {
+      return { error: data.error_description ?? data.msg ?? 'Sign in failed.' };
+    }
+    return {
+      session: {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token ?? '',
+        email: data.user?.email ?? email,
+        expires_at: jwtExp(data.access_token) ?? undefined,
+      },
+    };
+  } catch {
+    return { error: 'Network error — check your connection.' };
+  }
+}
 
 export async function signOut(accessToken: string): Promise<void> {
   try {
@@ -124,44 +157,6 @@ export async function signOut(accessToken: string): Promise<void> {
   } catch {
     // Best-effort — clear local session regardless
   }
-}
-
-// ---------------------------------------------------------------------------
-// Identity management — fetch linked providers
-// ---------------------------------------------------------------------------
-
-export interface UserIdentity {
-  id: string;
-  provider: string;
-  identity_data?: { email?: string; full_name?: string; avatar_url?: string };
-  created_at?: string;
-}
-
-/**
- * Fetch the current user's linked identities from Supabase.
- * Returns the list of identity providers (e.g. 'google', 'github').
- */
-export async function fetchUserIdentities(
-  accessToken: string
-): Promise<{ ok: true; identities: UserIdentity[] } | { ok: false }> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-    if (!res.ok) return { ok: false };
-    const data = (await res.json()) as { identities?: UserIdentity[] };
-    return { ok: true, identities: data.identities ?? [] };
-  } catch {
-    return { ok: false };
-  }
-}
-
-/** Extract unique provider names from an identities array. */
-export function getLinkedProviders(identities: UserIdentity[]): Set<string> {
-  return new Set(identities.map((i) => i.provider));
 }
 
 // ---------------------------------------------------------------------------
