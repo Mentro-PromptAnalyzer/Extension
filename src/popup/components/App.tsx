@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsTab } from './SettingsTab';
 import { AccountTab } from './AccountTab';
-import { AuthSession, getValidSession } from '../auth';
+import { AuthSession, getValidSession, validateSession, saveSession } from '../auth';
 import { Settings, loadSettings, DEFAULT_SETTINGS } from '../settings';
 import { applyTheme } from '../themes';
 
@@ -108,10 +108,20 @@ export function App() {
   useEffect(() => {
     // Resolve with defaults after 3 s so the UI never stays blank indefinitely
     // (e.g. in E2E environments where Chrome storage resolves slowly).
+    let cancelled = false;
     const timeout = setTimeout(() => setReady(true), 3000);
 
     Promise.all([getValidSession(), loadSettings()])
-      .then(([s, st]) => {
+      .then(async ([s, st]) => {
+        // Validate the session token is still accepted by Supabase
+        if (s) {
+          const valid = await validateSession(s.access_token);
+          if (!valid) {
+            saveSession(null);
+            s = null;
+          }
+        }
+        if (cancelled) return;
         clearTimeout(timeout);
         setSession(s);
         setSettings(st);
@@ -120,11 +130,15 @@ export function App() {
       })
       .catch((err: unknown) => {
         console.error('[popup] init failed:', err instanceof Error ? err.message : err);
+        if (cancelled) return;
         clearTimeout(timeout);
         setReady(true);
       });
 
-    return () => clearTimeout(timeout);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, []);
 
   return (

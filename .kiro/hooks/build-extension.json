@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Build extension",
+      "description": "Build our extension via 'npm run build' everytime Kiro is done chatting with me.",
+      "trigger": "Stop",
+      "action": {
+        "type": "command",
+        "command": "npm run build"
+      },
+      "enabled": true
+    }
+  ]
+}

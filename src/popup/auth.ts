@@ -107,6 +107,30 @@ export async function getValidSession(): Promise<AuthSession | null> {
   return refreshed ?? session; // fall back to stale session if refresh fails
 }
 
+/**
+ * Validate that the access token is still accepted by Supabase.
+ * Hits the lightweight /auth/v1/user endpoint.
+ * Returns false only on 401 (token revoked/expired beyond refresh).
+ * Returns true on success, 429, 5xx, or network errors to avoid
+ * invalidating sessions due to transient issues.
+ */
+export async function validateSession(accessToken: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    if (res.status === 401) return false;
+    // 429, 5xx, or any other non-401 error — preserve session
+    return true;
+  } catch {
+    // Network error — don't invalidate, could be transient
+    return true;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Sign out
 // ---------------------------------------------------------------------------
