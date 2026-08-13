@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsTab } from './SettingsTab';
 import { AccountTab } from './AccountTab';
-import { AuthSession, getValidSession } from '../auth';
+import { AuthSession, getValidSession, validateSession, saveSession } from '../auth';
 import { Settings, loadSettings, DEFAULT_SETTINGS } from '../settings';
 import { applyTheme } from '../themes';
 
@@ -111,8 +111,16 @@ export function App() {
     const timeout = setTimeout(() => setReady(true), 3000);
 
     Promise.all([getValidSession(), loadSettings()])
-      .then(([s, st]) => {
+      .then(async ([s, st]) => {
         clearTimeout(timeout);
+        // Validate the session token is still accepted by Supabase
+        if (s) {
+          const valid = await validateSession(s.access_token);
+          if (!valid) {
+            saveSession(null);
+            s = null;
+          }
+        }
         setSession(s);
         setSettings(st);
         applyTheme(st.theme);
