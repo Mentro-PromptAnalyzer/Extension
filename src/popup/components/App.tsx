@@ -108,11 +108,11 @@ export function App() {
   useEffect(() => {
     // Resolve with defaults after 3 s so the UI never stays blank indefinitely
     // (e.g. in E2E environments where Chrome storage resolves slowly).
+    let cancelled = false;
     const timeout = setTimeout(() => setReady(true), 3000);
 
     Promise.all([getValidSession(), loadSettings()])
       .then(async ([s, st]) => {
-        clearTimeout(timeout);
         // Validate the session token is still accepted by Supabase
         if (s) {
           const valid = await validateSession(s.access_token);
@@ -121,6 +121,8 @@ export function App() {
             s = null;
           }
         }
+        if (cancelled) return;
+        clearTimeout(timeout);
         setSession(s);
         setSettings(st);
         applyTheme(st.theme);
@@ -128,11 +130,15 @@ export function App() {
       })
       .catch((err: unknown) => {
         console.error('[popup] init failed:', err instanceof Error ? err.message : err);
+        if (cancelled) return;
         clearTimeout(timeout);
         setReady(true);
       });
 
-    return () => clearTimeout(timeout);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, []);
 
   return (

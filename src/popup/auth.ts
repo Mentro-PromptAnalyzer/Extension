@@ -109,7 +109,10 @@ export async function getValidSession(): Promise<AuthSession | null> {
 
 /**
  * Validate that the access token is still accepted by Supabase.
- * Hits the lightweight /auth/v1/user endpoint — returns false on 401.
+ * Hits the lightweight /auth/v1/user endpoint.
+ * Returns false only on 401 (token revoked/expired beyond refresh).
+ * Returns true on success, 429, 5xx, or network errors to avoid
+ * invalidating sessions due to transient issues.
  */
 export async function validateSession(accessToken: string): Promise<boolean> {
   try {
@@ -119,7 +122,9 @@ export async function validateSession(accessToken: string): Promise<boolean> {
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    return res.ok;
+    if (res.status === 401) return false;
+    // 429, 5xx, or any other non-401 error — preserve session
+    return true;
   } catch {
     // Network error — don't invalidate, could be transient
     return true;
