@@ -36,6 +36,11 @@ extension/
 
 ## Development
 
+The published scoring endpoint is defined in `src/background/ai-proxy.ts` and
+must match the API host permission in `manifest.json`. `npm run zip` builds a
+Chrome Web Store ZIP, checks the endpoint and version, and strips the development
+manifest key. Upload the ZIP manually after the release PR is merged.
+
 ```bash
 cd extension
 npm install
