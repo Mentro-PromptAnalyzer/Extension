@@ -19,6 +19,8 @@ const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1'
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const version = pkg.version;
 const outFile = path.join(ROOT, `mentro-${version}.zip`);
+const scoreUrl = 'https://api.mentro.elischiffler.dev/api/chat/stream';
+const apiPermission = 'https://api.mentro.elischiffler.dev/*';
 
 // 1. Build
 console.log('Building…');
@@ -27,6 +29,13 @@ execSync('npm run build', { cwd: ROOT, stdio: 'inherit' });
 // 2. Strip key from manifest
 console.log('Stripping key from manifest…');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
+if (manifest.version !== version || !manifest.host_permissions.includes(apiPermission)) {
+  throw new Error('Manifest version or Mentro API permission does not match this release.');
+}
+const background = fs.readFileSync(path.join(ROOT, 'dist/background.js'), 'utf8');
+if (!background.includes(scoreUrl) || background.includes('mentro-lucid-dust-3580.fly.dev')) {
+  throw new Error('Built background worker has an unexpected Mentro API endpoint.');
+}
 delete manifest.key;
 const manifestJson = JSON.stringify(manifest, null, 2);
 

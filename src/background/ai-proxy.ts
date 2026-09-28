@@ -1,12 +1,13 @@
 // ---------------------------------------------------------------------------
-// AI scoring proxy — streams requests to the Fly.dev backend via SSE.
+// AI scoring proxy — streams requests to the Mentro API via SSE.
 // ---------------------------------------------------------------------------
 
 import type { LiveScore } from '../analysis/engine';
 import type { HeuristicContext } from '../analysis/ai';
 import { getStoredSession, refreshStoredSession, getValidAccessToken } from './auth';
 
-const SCORE_URL = import.meta.env.VITE_SCORE_URL as string;
+// Keep the Web Store build independent of machine-local Vite environment files.
+const SCORE_URL = 'https://api.mentro.elischiffler.dev/api/chat/stream';
 const TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------

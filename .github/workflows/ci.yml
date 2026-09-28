@@ -59,13 +59,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build extension
-        run: npm run build
-        env:
-          # The background worker reads this at runtime via import.meta.env.
-          # Provide a placeholder so the build doesn't fail — E2E tests never
-          # hit the Fly.dev backend.
-          VITE_SCORE_URL: https://placeholder.invalid
+      - name: Build and verify Web Store package
+        run: npm run zip
 
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
